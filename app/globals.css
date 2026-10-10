@@ -1,0 +1,31 @@
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+}
+
+.placeholder {
+  display: grid;
+  min-height: 100dvh;
+  place-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.placeholder h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.placeholder p {
+  margin: 0;
+}
