@@ -20,7 +20,7 @@ jobs:
 
       # pnpm の版は package.json の packageManager を単一ソースにする
       # （action 側に version を書くと ERR_PNPM_BAD_PM_VERSION になる）
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       # Node の版は package.json の engines.node を単一ソースにする
       - uses: actions/setup-node@v7
