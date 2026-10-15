@@ -1,3 +1,6 @@
+// 意図的な型エラー（Issue #4: CI が型エラーで失敗することの確認用。確認後に revert する）
+export const ciTypeErrorCheck: number = "not a number";
+
 export default function Home() {
   return (
     <main className="grid min-h-dvh place-content-center gap-2 p-4 text-center">
