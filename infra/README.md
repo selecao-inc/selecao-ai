@@ -1,12 +1,14 @@
 # infra
 
-Vercel プロジェクト `selecao-ai` とドメイン（`selecao.ai` / `www.selecao.ai`）を Terraform で管理する。
+Vercel プロジェクト `selecao-ai` とドメイン（`selecao.ai` / `www.selecao.ai`）、GitHub リポジトリと main のブランチ保護を Terraform で管理する。
 state と実行は HCP Terraform（Organization `selecao-inc` / Workspace `selecao-ai`）。
 
 ## 管理しているもの
 
 | リソース | 内容 |
 |---|---|
+| `github_repository.site` | 既存の `selecao-inc/selecao-ai` を import。説明・既存機能を保持、Squash のみ許可、マージ後のブランチ自動削除 |
+| `github_branch_protection.main` | PR 必須・必須チェック `ci`・承認 0 人・管理者にも適用・force push / 削除禁止 |
 | `vercel_project.site` | `selecao-ai`・Next.js・Git 連携 `selecao-inc/selecao-ai`・本番ブランチ `main` |
 | `vercel_project_domain.apex` | `selecao.ai` |
 | `vercel_project_domain.www` | `www.selecao.ai` → `selecao.ai` へ転送 |
@@ -20,18 +22,52 @@ DNS はお名前.com で手作業管理（[docs/RUNBOOK.md](../docs/RUNBOOK.md)�
 2. HCP Terraform が PR に plan を出す（PR のチェック）。**plan が唯一のレビュー機会**なので、作成・変更・削除の内容を必ず確認する
 3. main にマージすると HCP Terraform が自動で apply する（Auto-apply ON）
 
-手元で `terraform apply` / `terraform plan` はしない。
+手元で `terraform apply` はしない。plan は HCP の PR チェックで確認する。明示的に許可された場合のみ、HCP 接続済みの CLI から `terraform plan`（`-out` なしの speculative plan）を実行する。
+
+### GitHub の初回取り込み（Issue #6）
+
+`github.tf` の `import` ブロックは既存の `selecao-ai` を対象とする。初回 plan では repository の import と設定更新、main の保護作成が表示される。取り込みは承認後の HCP apply で行うため、手元で `terraform import` を実行しない。import ブロックは取り込み後も残せる。
+
+必須チェックは `ci` のみ。HCP Terraform の plan は `infra/` を触らない PR では実行されないため、必須チェックに追加しない。承認人数 0 人でも PR は必須で、管理者にも適用される。
+
+初回導入の PR は plan 結果を本文に記載した時点で人間の承認待ちとする。マージすると Auto-apply が動くため、エージェントはマージしない。apply 後の受け入れ確認は [RUNBOOK](../docs/RUNBOOK.md#github-ブランチ保護) に従う。
 
 ## 初回セットアップ（済み・Issue #2）
 
 - HCP Terraform Workspace `selecao-ai`：VCS 連携 `selecao-inc/selecao-ai`、Working Directory `infra`、Auto-apply ON、Terraform 1.16.6、Execution mode Remote
 - Workspace の環境変数（すべて Sensitive）：
   - `VERCEL_API_TOKEN` — Vercel チーム `yusukeohno16s-projects` のトークン
-  - `GITHUB_TOKEN` — GitHub 設定用（#6 で使用）
+  - `GITHUB_TOKEN` — GitHub リポジトリ・ブランチ保護の管理用
   - `SOPS_AGE_KEY` — age 秘密鍵（`secrets.enc.yaml` の復号用）
 - Vercel の GitHub App を `selecao-inc` に導入
 
 Terraform の版を上げるときは、`versions.tf` の `required_version` と Workspace 設定を同時に変える。
+
+### GITHUB_TOKEN の推奨設定と更新
+
+HCP の `GITHUB_TOKEN` は **fine-grained personal access token（PAT）**。現在のトークン名は `hcp-terraform-selecao-ai`、有効期限は **2027-10-21**。値は記録しない。
+
+現在の設定（2026-10-21 に管理者が確認）は、Repository access が `selecao-inc/selecao-ai` のみ、Administration: **Read and write**、Contents: **Read and write**、Metadata: **Read-only**。
+
+推奨設定は次のとおり。
+
+| 項目 | 設定 |
+|---|---|
+| Resource owner | `selecao-inc` |
+| Repository access | Only select repositories → `selecao-ai` のみ |
+| Repository permissions | Administration: **Read and write**、Metadata: **Read** |
+| Expiration | 有効期限を設定し、期限前に更新する。組織の有効期限ポリシーに従う |
+
+- [ ] PR #18 の apply 後に Contents を **Read-only** に下げ、HCP で **Plan only** を実行してエラーなし・差分ゼロなら確定する
+
+発行者は対象リポジトリの管理権限を持つ人間とし、組織の承認が必要な場合は承認完了後に利用する。期限と更新担当者を管理し、期限前に次の手順で更新する。
+
+1. `2027-10-21` より前に、同じ対象リポジトリと運用で確認済みの権限で新しい fine-grained PAT を再発行する。Contents の縮小は上記 TODO の確認結果に従う
+2. HCP Terraform Workspace `selecao-ai` の Variables で、**Environment variable** の `GITHUB_TOKEN` を新しい値に置き換え、**Sensitive** を有効にする。トークンをコード・PR・ログに出さない
+3. HCP の **Plan only** で認証エラーがないことと、意図しない差分がないことを確認する。Auto-apply ON のため、更新確認に Plan and apply は使わない
+4. 確認後に旧 PAT を失効させ、新しい有効期限を記録する。確認に失敗した場合は旧 PAT を失効させず、設定を見直す
+
+設定項目と権限は GitHub の [PAT 管理手順](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)・[fine-grained PAT の権限一覧](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens) を参照。
 
 ## 手元での確認
 
