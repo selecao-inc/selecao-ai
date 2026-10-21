@@ -2,6 +2,27 @@
 
 運用手順。インフラ構成は [infra/README.md](../infra/README.md)。
 
+## GitHub ブランチ保護
+
+`infra/github.tf` で既存の `selecao-inc/selecao-ai` を import し、main を保護する。PR 必須・必須チェック `ci`・承認 0 人・管理者にも適用・force push / 削除禁止。マージ方法は Squash のみで、マージ後に作業ブランチを自動削除する。
+
+HCP Terraform の plan チェックは `infra/` を変更しない PR で走らないため、必須チェックに追加しない。
+
+### 初回導入の承認
+
+1. PR 本文の plan が repository の import・設定更新と main の保護作成だけで、既存の Vercel / SOPS に意図しない変更がないことを確認する
+2. plan 結果を確認した人間がマージを承認する。HCP は Auto-apply ON のため、マージが反映の契機になる
+3. 承認前は apply・main への直接 push テスト・GitHub 設定の手動変更を実行しない
+
+### 承認・apply 後に人間が行う受け入れ確認
+
+- main への直接 push が拒否される
+- `ci` が失敗している PR はマージできない
+- `ci` が成功している PR を Squash でマージできる
+- HCP Terraform の plan が差分ゼロになる
+
+初回 PR の plan には導入差分があるため、これらは承認・apply 後まで未完了として扱う。
+
 ## DNS（お名前.com）
 
 `selecao.ai` の DNS はお名前.com（ネームサーバー `01〜04.dnsv.jp`）で手作業管理する。Terraform では管理しない。
