@@ -43,7 +43,7 @@ resource "github_branch_protection" "main" {
 
   required_status_checks {
     strict = true
-    # HCP Terraform の plan は infra/ を触らない PR で走らないため必須にしない
+    # HCP Terraform のチェックは全 PR での実行条件が未確認のため必須にしない
     contexts = ["ci"]
   }
 
