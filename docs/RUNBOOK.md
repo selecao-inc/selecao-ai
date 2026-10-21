@@ -23,6 +23,15 @@ HCP Terraform の plan チェックは `infra/` を変更しない PR で走ら�
 
 初回 PR の plan には導入差分があるため、これらは承認・apply 後まで未完了として扱う。受け入れ確認を終えた人間が Issue #6 を閉じる。
 
+#### 受け入れ確認の結果（2026-10-21、PR #18 の apply 後）
+
+| 確認項目 | 結果 |
+|---|---|
+| main への直接 push | 拒否された（`GH006: Protected branch update failed`、PR 必須・`ci` 必須） |
+| `ci` が失敗している PR | マージできなかった（テスト用 PR #20 が `BLOCKED`、Squash マージは base branch policy で拒否。PR はマージせずクローズ） |
+| `ci` が成功している PR | この記録を追加した PR を Squash でマージした |
+| HCP Terraform の plan | 未確認（Contents を Read-only に下げた後の plan とあわせて確認する） |
+
 ### CI 障害時の break-glass
 
 CI が壊れて全員がマージできない場合に限り、人間の管理者が次の手順で復旧する。
