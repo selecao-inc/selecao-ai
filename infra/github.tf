@@ -24,6 +24,13 @@ resource "github_repository" "site" {
   allow_squash_merge     = true
   allow_merge_commit     = false
   allow_rebase_merge     = false
+
+  # 誤削除を plan で止め、destroy を許可した場合も完全削除せずアーカイブする
+  archive_on_destroy = true
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "github_branch_protection" "main" {
