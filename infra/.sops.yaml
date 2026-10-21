@@ -1,0 +1,4 @@
+creation_rules:
+  # age 公開鍵（Issue #2 で発行。秘密ではない）。秘密鍵は HCP の SOPS_AGE_KEY と各自の ~/.config/sops/age/keys.txt
+  - path_regex: secrets\.enc\.yaml$
+    age: age1exj0e333qy5ngnuv50shvd6qln8lhw2l6qup3w7j85juss05wa2sjnrtgv
