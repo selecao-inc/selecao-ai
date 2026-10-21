@@ -6,7 +6,7 @@
 
 `infra/github.tf` で既存の `selecao-inc/selecao-ai` を import し、main を保護する。PR 必須・必須チェック `ci`・承認 0 人・管理者にも適用・force push / 削除禁止。マージ方法は Squash のみで、マージ後に作業ブランチを自動削除する。
 
-HCP Terraform の plan チェックは `infra/` を変更しない PR で走らないため、必須チェックに追加しない。
+`infra/` を変更していない [PR #20](https://github.com/selecao-inc/selecao-ai/pull/20)・[PR #21](https://github.com/selecao-inc/selecao-ai/pull/21) でも、`Terraform Cloud/selecao-inc/...` チェックが実行され、成功した（2026-10-21）。HCP の VCS トリガー設定は未確認で、全 PR での実行条件は確認できていないため、必須チェックは引き続き `ci` のみとする。`infra/` の変更時は HCP の plan をレビューする。
 
 ### 初回導入の承認
 
@@ -30,7 +30,7 @@ HCP Terraform の plan チェックは `infra/` を変更しない PR で走ら�
 | main への直接 push | 拒否された（`GH006: Protected branch update failed`、PR 必須・`ci` 必須） |
 | `ci` が失敗している PR | マージできなかった（テスト用 PR #20 が `BLOCKED`、Squash マージは base branch policy で拒否。PR はマージせずクローズ） |
 | `ci` が成功している PR | この記録を追加した PR を Squash でマージした |
-| HCP Terraform の plan | 未確認（Contents を Read-only に下げた後の plan とあわせて確認する） |
+| HCP Terraform の plan | 差分ゼロ（Plan only、`run-pcGEpBM7hh9CLVEV`、Contents Read-only 化の後に実施。0 to add / 0 to change / 0 to destroy、認証エラーなし。[Issue #6](https://github.com/selecao-inc/selecao-ai/issues/6#issuecomment-6318463699)） |
 
 ### CI 障害時の break-glass
 
@@ -39,7 +39,7 @@ CI が壊れて全員がマージできない場合に限り、人間の管理�
 1. 修正 PR を用意し、障害の原因・一時的に外す保護・復元担当者を PR に記録する
 2. GitHub の Settings → Branches で main の保護を編集し、管理者への適用（`enforce_admins`）または障害中の必須チェックだけを一時的に外す。保護ルール全体は削除しない
 3. 人間の管理者が修正 PR を Squash でマージする
-4. 直後に HCP Terraform で **Plan only** を実行し、一時変更を Terraform の定義へ戻す差分と、意図しない差分がないことを確認する。`infra/` を触らない修正では自動 run が走らないため、手動で実行する。手動 run は最新 commit を取得しないので、対象の構成が復旧させる main の Terraform 定義であることも確認する
+4. 直後に HCP Terraform で **Plan only** を実行し、一時変更を Terraform の定義へ戻す差分と、意図しない差分がないことを確認する。VCS トリガー設定は未確認のため、自動 run の有無に依存せず手動で確認する。手動 run は最新 commit を取得しないので、対象の構成が復旧させる main の Terraform 定義であることも確認する
 5. plan を確認・承認した人間が HCP で **Plan and apply (standard)** を実行して保護を戻す。Auto-apply ON のため、この run は plan 成功後に自動反映される。事前確認には必ず Plan only を使う
 6. GitHub 上で管理者への適用・必須チェック `ci` が復元され、HCP の Plan only が差分ゼロになることを確認して PR に記録する
 
