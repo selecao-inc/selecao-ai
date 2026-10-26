@@ -17,7 +17,7 @@ terraform {
     }
     vercel = {
       source  = "vercel/vercel"
-      version = "5.23.0"
+      version = "5.24.0"
     }
     sops = {
       source  = "carlpett/sops"
