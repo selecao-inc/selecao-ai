@@ -22,6 +22,9 @@ pnpm build
 
 ## ドキュメント
 
-- `AGENTS.md` — AI エージェント向けの作業ルール
-- `docs/` — 構成・運用手順・決定記録（順次追加）
+- [AGENTS.md](AGENTS.md) — AI エージェント向けの作業ルール
+- [ARCHITECTURE](docs/ARCHITECTURE.md) — 構成図・サービスの役割・技術選定
+- [RUNBOOK](docs/RUNBOOK.md) — 環境変数・ドメイン・DNS・ブランチ保護・復旧・依存更新
+- [DECISIONS](docs/DECISIONS.md) — ADR 形式の決定記録・Notion CMS の方針
+- [infra/README.md](infra/README.md) — インフラ定義・初回セットアップ・鍵の前提
 - 設計書・マイルストーン・Issue — GitHub Issues / Notion
