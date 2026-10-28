@@ -22,10 +22,17 @@ jobs:
       # Codex など他のツールと別の指示で動いてしまうため、紛れ込んだら失敗させる
       - name: AGENTS.md 以外のエージェント指示ファイルが無いこと
         run: |
-          found=$(git ls-files | grep -iE '(^|/)(CLAUDE(\.local)?|CODEX|GEMINI)\.md$|(^|/)\.cursorrules$' || true)
+          # -z で NUL 区切り・引用なしのパスを受け取る（既定では日本語などのパスが "..." で囲まれ、ファイル名で判定できない）
+          shopt -s nocasematch
+          found=""
+          while IFS= read -r -d '' path; do
+            case "${path##*/}" in
+              claude.md|claude.local.md|codex.md|gemini.md|.cursorrules) found+="$path"$'\n' ;;
+            esac
+          done < <(git ls-files -z)
           if [ -n "$found" ]; then
             echo "::error::AGENTS.md 以外のエージェント指示ファイルがあります。内容を AGENTS.md に統合して削除してください"
-            echo "$found"
+            printf '%s' "$found"
             exit 1
           fi
 
