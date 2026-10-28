@@ -18,6 +18,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # 指示ファイルは AGENTS.md だけ。CLAUDE.md があると Claude Code は AGENTS.md を読まなくなり、
+      # Codex など他のツールと別の指示で動いてしまうため、紛れ込んだら失敗させる
+      - name: AGENTS.md 以外のエージェント指示ファイルが無いこと
+        run: |
+          found=$(git ls-files | grep -iE '(^|/)(CLAUDE(\.local)?|CODEX|GEMINI)\.md$|(^|/)\.cursorrules$' || true)
+          if [ -n "$found" ]; then
+            echo "::error::AGENTS.md 以外のエージェント指示ファイルがあります。内容を AGENTS.md に統合して削除してください"
+            echo "$found"
+            exit 1
+          fi
+
       # pnpm の版は package.json の packageManager を単一ソースにする
       # （action 側に version を書くと ERR_PNPM_BAD_PM_VERSION になる）
       - uses: pnpm/action-setup@v6
