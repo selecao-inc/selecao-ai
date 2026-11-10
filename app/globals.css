@@ -1,1 +1,64 @@
 @import "tailwindcss";
+
+/* スマートフォン（幅 760px 以下）。案G の切り替え幅 */
+@custom-variant sp (@media (max-width: 760px));
+
+@theme {
+  --font-sans: var(--font-noto-sans-jp), system-ui, sans-serif;
+
+  /* 地の色（うすクリーム） */
+  --color-ground: #fdfcfa; /* ページ */
+  --color-surface: #ffffff; /* 会話の枠 */
+  --color-sub: #f5f4f1; /* 吹き出し・問い合わせ枠 */
+  --color-ph: #eeede9; /* 画像の仮枠 */
+  --color-line: #e7e5e0; /* 罫線 */
+
+  /* 文字 */
+  --color-ink: #0a0a0a;
+  --color-muted: #525252; /* 補足 */
+  --color-faint: #666666; /* 薄い補足 */
+  --color-dummy: #b42318; /* ダミーの注記のみ */
+
+  /* 差し色。送信ボタン（入力中）とカーソルだけに使う。色は未決のため暫定値で、変えるときはここだけを直す */
+  --color-accent: #2f6bff;
+
+  --animate-caret: caret 1s steps(1) infinite;
+  --animate-dot: dot 1.2s infinite;
+  --animate-pulse-ring: pulse-ring 1s infinite;
+
+  @keyframes caret {
+    50% {
+      opacity: 0;
+    }
+  }
+  @keyframes dot {
+    0%,
+    80%,
+    100% {
+      opacity: 0.2;
+    }
+    40% {
+      opacity: 1;
+    }
+  }
+  @keyframes pulse-ring {
+    50% {
+      opacity: 0.35;
+    }
+  }
+}
+
+/* 明るい配色のみ（OS がダークでも明るく表示する） */
+:root {
+  color-scheme: light;
+}
+
+h1,
+h2,
+p {
+  text-wrap: pretty;
+}
+
+a:hover {
+  opacity: 0.7;
+}
