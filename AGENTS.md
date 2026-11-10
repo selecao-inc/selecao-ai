@@ -8,6 +8,7 @@ AI エージェントはこのファイルのルールに従って作業する�
 1. このファイル
 2. `docs/`（ARCHITECTURE / RUNBOOK / DECISIONS。作成済みのもののみ）
 3. 担当する GitHub Issue（`gh issue view <番号> --repo selecao-inc/selecao-ai`）
+4. [ソフトウェアファクトリー設計書 v0.1](docs/factory/README.md)
 
 ## ルール
 
