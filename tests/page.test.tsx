@@ -4,7 +4,12 @@ import Home from "@/app/page";
 
 beforeEach(() => {
   // jsdom には matchMedia が無い。会話デモは動かさない設定で描画する
-  vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query }));
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: true,
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
 });
 
 afterEach(() => {

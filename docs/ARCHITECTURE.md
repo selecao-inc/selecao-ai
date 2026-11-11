@@ -54,10 +54,10 @@ HCP の認証用環境変数と、サイトへ渡す環境変数は別物。HCP 
 | `app/layout.tsx` | `<html lang="ja">`、書体 Noto Sans JP（`next/font/google`、400／500／700）、地の色。明るい配色のみ（ダークモードなし） |
 | `app/page.tsx` | トップページ（サーバーコンポーネント）。ヘッダー → ファーストビュー → 注目の事例 → サービス → 強み → 事例 → 問い合わせへの誘導 → フッター。リンク先は当面ページ内アンカー |
 | `content/home.ts` | ページの文言とダミーデータ（相談の例・工程・サービス・事例など）。文言の変更はここだけで行う |
-| `components/ConversationDemo.tsx` | ファーストビューの会話デモとカテゴリのチップ（クライアントコンポーネント）。40ms ごとに経過時間から状態を求めて描画する。`prefers-reduced-motion: reduce` では動かさず、1つ目の相談の全工程完了を表示する。スクリーンリーダーには `role="img"` の1枚の画像として伝える |
+| `components/ConversationDemo.tsx` | ファーストビューの会話デモとカテゴリのチップ（クライアントコンポーネント）。40ms ごとに経過時間から状態を求めて描画する。`prefers-reduced-motion: reduce` では動かさず、1つ目の相談の全工程完了を表示する。設定の変更も購読し、再生中に reduce になれば止めて全工程完了に戻し、解除されれば最初から再生する。スクリーンリーダーには `role="img"` の1枚の画像として伝える |
 | `components/conversation-timeline.ts` | 会話デモの段階（入力 → 考え中 → 返信 → 工程 → 表示）の進み方。経過時間だけから表示状態を返す純粋関数で、画面から切り離してテストする |
 
-テストは `tests/page.test.tsx`（見出し・注記・フッター）、`tests/conversation-timeline.test.ts`（段階の境目とループ）、`tests/conversation-demo.test.tsx`（reduced motion と再生開始）。
+テストは `tests/page.test.tsx`（見出し・注記・フッター）、`tests/conversation-timeline.test.ts`（段階の境目とループ）、`tests/conversation-demo.test.tsx`（reduced motion・再生開始・再生中の設定変更・解除・アンマウント時の片付け）。
 
 ## Notion の位置付け
 

@@ -11,16 +11,30 @@ export function ConversationDemo() {
   const [state, setState] = useState<DemoState>(STILL_STATE);
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const start = Date.now();
-    const timer = setInterval(() => {
-      const next = demoStateAt(CONSULTATIONS, Date.now() - start);
-      // 変化がない tick では再描画しない
-      setState((prev) =>
-        prev.index === next.index && prev.phase === next.phase && prev.n === next.n ? prev : next,
-      );
-    }, TICK_MS);
-    return () => clearInterval(timer);
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let timer: ReturnType<typeof setInterval> | undefined;
+    // 再生中に設定が変わることもあるため、変更のたびに止めて静止表示へ戻すか、最初から再生し直す
+    const apply = () => {
+      clearInterval(timer);
+      if (reduce.matches) {
+        setState(STILL_STATE);
+        return;
+      }
+      const start = Date.now();
+      timer = setInterval(() => {
+        const next = demoStateAt(CONSULTATIONS, Date.now() - start);
+        // 変化がない tick では再描画しない
+        setState((prev) =>
+          prev.index === next.index && prev.phase === next.phase && prev.n === next.n ? prev : next,
+        );
+      }, TICK_MS);
+    };
+    apply();
+    reduce.addEventListener("change", apply);
+    return () => {
+      reduce.removeEventListener("change", apply);
+      clearInterval(timer);
+    };
   }, []);
 
   const { index, phase, n } = state;
