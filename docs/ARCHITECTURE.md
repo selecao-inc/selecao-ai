@@ -1,6 +1,6 @@
 # ARCHITECTURE
 
-M1 の構成。根拠は [AGENTS.md](../AGENTS.md)、[package.json](../package.json)、[Next.js 設定](../next.config.ts)、[infra](../infra/README.md)、[CI](../.github/workflows/ci.yml)。外部サービスの実設定をこの文書作成時に再確認したものではない。
+M1 の基盤と M2 のトップページの構成。根拠は [AGENTS.md](../AGENTS.md)、[package.json](../package.json)、[Next.js 設定](../next.config.ts)、[infra](../infra/README.md)、[CI](../.github/workflows/ci.yml)。外部サービスの実設定をこの文書作成時に再確認したものではない。
 
 ## 構成図
 
@@ -36,14 +36,28 @@ HCP の認証用環境変数と、サイトへ渡す環境変数は別物。HCP 
 
 | 選定 | 現状と採用理由 |
 |---|---|
-| Next.js / React / TypeScript | `app/` の App Router に画面・layout・metadata を集約し、Vercel の `nextjs` プロジェクトで配信する。M1 は準備中の `/` のみで、リクエストごとのデータ取得はない。静的生成方針は `AGENTS.md` にあるが、`output: "export"` の設定ではない |
-| Tailwind CSS v4 | `app/globals.css` と画面のユーティリティクラスでスタイルを記述。CSS 処理は `next.config.ts` の Turbopack 設定にある |
+| Next.js / React / TypeScript | `app/` の App Router に画面・layout・metadata を集約し、Vercel の `nextjs` プロジェクトで配信する。ページはトップ `/` のみで（構成は下の「ページ構成」）、リクエストごとのデータ取得はなく、ビルド時に静的生成される。静的生成方針は `AGENTS.md` にあるが、`output: "export"` の設定ではない |
+| Tailwind CSS v4 | `app/globals.css` と画面のユーティリティクラスでスタイルを記述。色・差し色・アニメーション・スマートフォンの切り替え幅（`sp:` = 幅 760px 以下）は `globals.css` の `@theme` / `@custom-variant` に集約する。CSS 処理は `next.config.ts` の Turbopack 設定にある |
 | pnpm / 固定依存 | `packageManager` と lockfile に基づく frozen install を CI と開発で共用し、意図しない版の差を避ける。Node は `engines.node` を正とする |
 | ESLint / TypeScript / Vitest | lint・型・画面テスト・build を同じ `ci` job で検証する。画面テストは `tests/page.test.tsx` |
 | Terraform + HCP Terraform | GitHub・Vercel の管理対象を PR の差分と plan でレビューし、state と実行を HCP に集約する |
 | SOPS / age | サイト用秘密情報を暗号化したまま Git で管理し、HCP の復号鍵から Vercel へ投入する |
 
 版の正本は `package.json`、`pnpm-lock.yaml`、`infra/versions.tf`、`infra/.terraform.lock.hcl`。数値の一覧は重複管理しない。
+
+## ページ構成
+
+トップページはデザイン案G（[Issue #37](https://github.com/selecao-inc/selecao-ai/issues/37)）。文言・事例は仮のもので、ダミーの表示を含む。
+
+| ファイル | 役割 |
+|---|---|
+| `app/layout.tsx` | `<html lang="ja">`、書体 Noto Sans JP（`next/font/google`、400／500／700）、地の色。明るい配色のみ（ダークモードなし） |
+| `app/page.tsx` | トップページ（サーバーコンポーネント）。ヘッダー → ファーストビュー → 注目の事例 → サービス → 強み → 事例 → 問い合わせへの誘導 → フッター。リンク先は当面ページ内アンカー |
+| `content/home.ts` | ページの文言とダミーデータ（相談の例・工程・サービス・事例など）。文言の変更はここだけで行う |
+| `components/ConversationDemo.tsx` | ファーストビューの会話デモとカテゴリのチップ（クライアントコンポーネント）。40ms ごとに経過時間から状態を求めて描画する。`prefers-reduced-motion: reduce` では動かさず、1つ目の相談の全工程完了を表示する。設定の変更も購読し、再生中に reduce になれば止めて全工程完了に戻し、解除されれば最初から再生する。スクリーンリーダーには `role="img"` の1枚の画像として伝える |
+| `components/conversation-timeline.ts` | 会話デモの段階（入力 → 考え中 → 返信 → 工程 → 表示）の進み方。経過時間だけから表示状態を返す純粋関数で、画面から切り離してテストする |
+
+テストは `tests/page.test.tsx`（見出し・注記・フッター）、`tests/conversation-timeline.test.ts`（段階の境目とループ）、`tests/conversation-demo.test.tsx`（reduced motion・再生開始・再生中の設定変更・解除・アンマウント時の片付け）。
 
 ## Notion の位置付け
 
