@@ -35,3 +35,4 @@
 繰り返し破られるルールは lint・構造テストへ昇格し、CI で pass/fail を返してブランチ保護で必須化する。人の承認が必要な変更は CODEOWNERS と保護設定で守る。昇格対象は振り返りで判断し、個別の変更として進める。
 
 現在のアプリ構成は [ARCHITECTURE](../ARCHITECTURE.md)、運用は [RUNBOOK](../RUNBOOK.md)、決定記録は [DECISIONS](../DECISIONS.md) を参照する。Issue #32 の概要 1・2・5・6 は workflow.md、3・4 は verification.md、0・7 はこの入口に対応する。
+
