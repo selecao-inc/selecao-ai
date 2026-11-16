@@ -2,8 +2,9 @@
 // 規則と対応表は docs/factory/verification.md の「PR の識別と変更範囲の判定」を正とする。
 //
 // 実行: node .github/scripts/pr-guard.mts（Node 24 の型除去でそのまま動かす。依存パッケージを持たない）
-// このファイル自体も聖域（CODEOWNERS）で、実装 PR からの変更は規則4で失敗させる。
-// pull_request で実行するため PR 側の版が動くが、書き換えには factory の Issue と大野の承認が要る。
+// ワークフロー（pull_request_target）は main（base）側のこのファイルだけを実行し、PR 側（head）のコードは実行しない。
+// そのため、PR でこのファイルやワークフローを書き換えても、その PR の判定は変わらない。
+// PR の本文・ブランチ名・変更ファイルは GitHub API から読む（PR のファイルは読み込みも実行もしない）。
 
 import { pathToFileURL } from "node:url";
 
@@ -182,6 +183,39 @@ export async function checkPullRequest(
   return { status: "pass", issue: n, kind };
 }
 
+export type ChangedFileEntry = { filename: string; previous_filename?: string };
+
+export const FILES_PER_PAGE = 100;
+
+// PR の変更ファイルをページ送りで集める。
+// List pull requests files は最大 3,000 件で打ち切られ、それ以上はエラーにならず空のページが返る。
+// 一覧の外に保護対象があっても合格にしないよう、PR 情報の changed_files と取得した現在パスの件数を照合する。
+// （リネーム元を足した配列の長さとは比べない。changed_files はファイル単位で数えるため）
+export async function listChangedFiles(
+  getPage: (page: number) => Promise<{ ok: true; files: ChangedFileEntry[] } | { ok: false; error: string }>,
+  expectedCount: number,
+): Promise<{ ok: true; paths: string[] } | { ok: false; error: string }> {
+  const paths: string[] = [];
+  let current = 0;
+  for (let page = 1; ; page++) {
+    const res = await getPage(page);
+    if (!res.ok) return { ok: false, error: `の変更ファイルを取得できません（${res.error}）` };
+    for (const f of res.files) {
+      current++;
+      paths.push(f.filename);
+      if (f.previous_filename) paths.push(f.previous_filename);
+    }
+    if (res.files.length < FILES_PER_PAGE) break;
+  }
+  if (current !== expectedCount) {
+    return {
+      ok: false,
+      error: `の変更ファイルを全件取得できません（PR の変更ファイル ${expectedCount} 件に対し、取得できたのは ${current} 件）。未検査のファイルが残るため判定できません。PR を分割してください`,
+    };
+  }
+  return { ok: true, paths };
+}
+
 // ---- 以下は GitHub Actions から実行するときだけ使う ----
 
 async function api(path: string, token: string): Promise<Response> {
@@ -213,22 +247,19 @@ async function main(): Promise<number> {
     body: string | null;
     head: { ref: string; sha: string };
     user: { login: string };
+    changed_files: number;
   };
 
-  const changedFiles: string[] = [];
-  for (let page = 1; ; page++) {
-    const res = await api(`/repos/${repository}/pulls/${prNumber}/files?per_page=100&page=${page}`, token);
-    if (!res.ok) {
-      console.log(`::error::PR #${prNumber} の変更ファイルを取得できません（HTTP ${res.status}）`);
-      return 1;
-    }
-    const files = (await res.json()) as { filename: string; previous_filename?: string }[];
-    for (const f of files) {
-      changedFiles.push(f.filename);
-      if (f.previous_filename) changedFiles.push(f.previous_filename);
-    }
-    if (files.length < 100) break;
+  const listed = await listChangedFiles(async (page) => {
+    const res = await api(`/repos/${repository}/pulls/${prNumber}/files?per_page=${FILES_PER_PAGE}&page=${page}`, token);
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    return { ok: true, files: (await res.json()) as ChangedFileEntry[] };
+  }, pr.changed_files);
+  if (!listed.ok) {
+    console.log(`::error::PR #${prNumber} ${listed.error}`);
+    return 1;
   }
+  const changedFiles = listed.paths;
 
   const getIssue = async (n: number): Promise<IssueLookup> => {
     try {

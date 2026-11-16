@@ -3,10 +3,19 @@ name: pr-guard
 # PR と Issue の対応と、変更してよい範囲を判定する（Issue #46）。規則は docs/factory/verification.md。
 # ci とは別のチェックにする: PR 本文の編集（edited）でも判定をやり直す必要があり、
 # ci に入れると本文の編集のたびに build まで走るため
+#
+# なぜ pull_request_target か（2026-11-16 大野決定）:
+#   pull_request では PR 側（head）のワークフローとスクリプトが動くため、同じ PR で判定器を
+#   「常に合格」に書き換えると判定を外せる。pull_request_target は base（main）側のワークフロー定義で動くので、
+#   PR で判定器やこのファイルを変えても、その PR の判定には効かない。
+# なぜ head を実行しないか:
+#   pull_request_target は base の文脈（GITHUB_TOKEN の権限）で動くため、PR のコードを checkout・実行すると
+#   PR 作成者のコードにその権限を渡すことになる。PR の情報は API から読み、PR のファイルには触れない。
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, edited, synchronize, reopened]
 
+# 読み取りだけ。secrets は使わない
 permissions:
   contents: read
   issues: read
@@ -20,14 +29,21 @@ jobs:
   pr-guard:
     runs-on: ubuntu-latest
     steps:
+      # base（PR の向き先のブランチ）の最新 commit を明示して取得する。
+      # pull_request_target では github.sha がそれにあたり、このワークフロー定義と同じ版のスクリプトになる。
+      # PR の head・merge の ref は取得しない
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
-      # Node の版は package.json の engines.node を単一ソースにする。
+      # Node の版は package.json の engines.node を単一ソースにする（base 側の package.json）。
       # 判定スクリプトは依存パッケージを持たないので pnpm install は不要
       - uses: actions/setup-node@v7
         with:
           node-version-file: package.json
 
+      # PR 本文などの未確認の入力はシェルに展開せず、スクリプトが API から読む
       - name: PR と Issue の対応・変更範囲を判定する
         run: node .github/scripts/pr-guard.mts
         env:
