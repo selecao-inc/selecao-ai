@@ -49,5 +49,6 @@ resource "github_branch_protection" "main" {
 
   required_pull_request_reviews {
     required_approving_review_count = 0
+    require_code_owner_reviews      = true
   }
 }

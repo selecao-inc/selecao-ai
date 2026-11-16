@@ -6,9 +6,43 @@
 
 ## GitHub ブランチ保護
 
-`infra/github.tf` で既存の `selecao-inc/selecao-ai` を import し、main を保護する。PR 必須・必須チェック `ci`・承認 0 人・管理者にも適用・force push / 削除禁止。マージ方法は Squash のみで、マージ後に作業ブランチを自動削除する。
+`infra/github.tf` で既存の `selecao-inc/selecao-ai` を import し、main を保護する。PR 必須・必須チェック `ci`・通常の承認人数 0 人・聖域の CODEOWNERS 承認必須・管理者にも適用・force push / 削除禁止。マージ方法は Squash のみで、マージ後に作業ブランチを自動削除する。
 
 `infra/` を変更していない [PR #20](https://github.com/selecao-inc/selecao-ai/pull/20)・[PR #21](https://github.com/selecao-inc/selecao-ai/pull/21) でも、`Terraform Cloud/selecao-inc/...` チェックが実行され、成功した（2026-10-21）。HCP の VCS トリガー設定は未確認で、全 PR での実行条件は確認できていないため、必須チェックは引き続き `ci` のみとする。`infra/` の変更時は HCP の plan をレビューする。
+
+### 聖域の承認（Issue #45）
+
+`.github/CODEOWNERS` は `/tests/scenarios/`・`/docs/factory/`・`/.github/`・`/infra/`・`/AGENTS.md` の所有者を `@YusukeOhno16` にする。CODEOWNERS 自体も `/.github/` に含まれる。Terraform は `require_code_owner_reviews = true` とし、`required_approving_review_count = 0`・`enforce_admins = true` を維持する。聖域以外の PR に一般の承認人数は要求しない。当面、マージ操作は全 PR で人が行う。
+
+定義は実装済みだが、HCP の反映・承認の強制は未確認。大野が対象 SHA の HCP plan を確認し、main の保護設定だけが変更されることを承認してからマージする。ローカルで `terraform apply` は実行しない。
+
+反映後、大野の指示を受けて次を確認し、対象 SHA・テスト PR 番号・CI・承認前後の状態・HCP run と結果をこの節と Issue #45 に記録する。テスト PR はマージせずクローズする。
+
+| 受け入れ確認 | 状態 |
+|---|---|
+| 1. bot の聖域変更 PR は、`ci` 成功後も大野の承認前は `BLOCKED` | 未実施（反映後の指示待ち） |
+| 2. 1 の PR を大野が承認するとマージ可能になる | 未実施（反映後の指示待ち） |
+| 3. bot の聖域以外だけの PR（例: `docs/ARCHITECTURE.md`）は、承認なしでも `ci` 成功でマージ可能になる | 未実施（反映後の指示待ち） |
+| 4. HCP の Plan only が差分ゼロになる | 未実施（反映後の指示待ち） |
+
+承認人数 0 のままで CODEOWNERS 承認が強制されないと判明したら停止して大野へ返す。全 PR の承認必須化へ無断で切り替えない。
+
+### AI 用 GitHub アカウントの運用
+
+AI の push・PR 作成は machine account `selecao-agents` で行い、大野（`YusukeOhno16`）がレビュー・承認する。大野自身が聖域を変更する場合も bot から PR を出す（GitHub では自分の PR を自分で承認できないため）。
+
+Issue #44 のセットアップとコメントにある確定手順は次のとおり。端末固有の設定の詳細は `~/.agents/guides/agent-github-account.md` を参照する。
+
+1. 大野が `agents@selecao.ai`（Google グループ、メンバーは大野のみ）で bot を作成し、2段階認証・回復手段を設定する。
+2. bot を対象リポジトリの外部コラボレーター（Write）として招待し、bot が承認する。org メンバー・admin にはしない。
+3. 大野が期限付き classic PAT（`repo`・`workflow` のみ）を発行する。外部コラボレーターでは fine-grained PAT の Resource owner に org を選べなかったため、この方式を採用した。
+4. PAT を macOS キーチェーンのアカウント `selecao-agents`・サービス `gh-token-selecao-agents` に保存する。値を会話・リポ・ログ・履歴へ残さず、保存後にクリップボードを空にする。
+5. `~/.zshenv` が、`~/orca/workspaces/selecao-ai/` 配下で起動した zsh にだけキーチェーンから `GH_TOKEN` を設定する。起動後の `cd` では切り替わらない。push はローカル git 設定の HTTPS pushurl と `gh auth git-credential` で同じトークンを使う（fetch は SSH）。
+6. 作業開始時、新しいシェルで `gh api user --jq .login` が `selecao-agents` と確認できなければ停止する。`gh api repos/selecao-inc/selecao-ai --jq .permissions` で `push: true`・`admin: false` も確認する。PR 作成後は `gh pr view <番号> --json author,headRefOid` で bot の名義と対象 SHA を記録する。
+
+トークンの期限は #44 の記録で 2027-11-15 15:00 UTC。更新作業は #52（2027年10月対応）で管理する。大野が bot の設定から同じ最小スコープの新しい期限付き PAT を発行し、上記と同じキーチェーン項目を更新する。新しいシェルで bot の名義・権限・push の認証を確認した後、旧 PAT を失効させ、新期限と検証結果を #52 に値なしで記録する。具体的な保存操作は端末の手順書に従い、PAT 自体を貼り付けない。
+
+同じ Mac の同じユーザーには大野の gh ログインと SSH 鍵が残る。この分離は既定の名義を分けるもので、権限を完全に隔離しない。隔離の強化は #51 のホールドアウト段階2・3で判断する。承認不能で締め出された場合は、下記の既存 break-glass を人間の管理者が行う。
 
 ### 初回導入の承認
 
@@ -36,14 +70,14 @@
 
 ### CI 障害時の break-glass
 
-CI が壊れて全員がマージできない場合に限り、人間の管理者が次の手順で復旧する。
+CI 障害または CODEOWNERS の承認不能で全員がマージできない場合に限り、人間の管理者が次の手順で復旧する。
 
 1. 修正 PR を用意し、障害の原因・一時的に外す保護・復元担当者を PR に記録する
-2. GitHub の Settings → Branches で main の保護を編集し、管理者への適用（`enforce_admins`）または障害中の必須チェックだけを一時的に外す。保護ルール全体は削除しない
+2. GitHub の Settings → Branches で main の保護を編集し、管理者への適用（`enforce_admins`）・障害中の必須チェック・承認不能な CODEOWNERS 承認要件のうち、復旧に必要なものだけを一時的に外す。保護ルール全体は削除しない
 3. 人間の管理者が修正 PR を Squash でマージする
 4. 直後に HCP Terraform で **Plan only** を実行し、一時変更を Terraform の定義へ戻す差分と、意図しない差分がないことを確認する。VCS トリガー設定は未確認のため、自動 run の有無に依存せず手動で確認する。手動 run は最新 commit を取得しないので、対象の構成が復旧させる main の Terraform 定義であることも確認する
 5. plan を確認・承認した人間が HCP で **Plan and apply (standard)** を実行して保護を戻す。Auto-apply ON のため、この run は plan 成功後に自動反映される。事前確認には必ず Plan only を使う
-6. GitHub 上で管理者への適用・必須チェック `ci` が復元され、HCP の Plan only が差分ゼロになることを確認して PR に記録する
+6. GitHub 上で管理者への適用・必須チェック `ci`・CODEOWNERS 承認要件が Terraform の定義どおりに復元され、HCP の Plan only が差分ゼロになることを確認して PR に記録する
 
 `.github/workflows/ci.yml` の job 名（必須チェック名）を変えるときは、`infra/github.tf` の `required_status_checks.contexts` も同じ PR で変更する。移行 PR 自体は旧チェック名が必須なので、保護の更新が反映されるまでは旧チェックも成功させる。
 
