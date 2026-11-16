@@ -28,7 +28,7 @@ DNS はお名前.com で手作業管理（[docs/RUNBOOK.md](../docs/RUNBOOK.md)�
 
 `github.tf` の `import` ブロックは既存の `selecao-ai` を対象とする。初回 plan では repository の import と設定更新、main の保護作成が表示される。取り込みは承認後の HCP apply で行うため、手元で `terraform import` を実行しない。import ブロックは取り込み後も残せる。
 
-必須チェックは `ci` のみ。HCP Terraform のチェックは全 PR での実行条件が未確認のため必須化せず、`infra/` の変更時は plan をレビューする。`infra/` を変更しない PR でのチェック実行例と未確認事項は [RUNBOOK](../docs/RUNBOOK.md#github-ブランチ保護) を参照。通常の承認人数 0 人でも PR は必須で、管理者にも適用される。Issue #45 で聖域の CODEOWNERS 承認必須を定義した。HCP 反映・受け入れ確認は未完了であり、運用と確認状況は [RUNBOOK](../docs/RUNBOOK.md#聖域の承認issue-45) を参照する。
+必須チェックは `ci` のみ。HCP Terraform のチェックは全 PR での実行条件が未確認のため必須化せず、`infra/` の変更時は plan をレビューする。`infra/` を変更しない PR でのチェック実行例と未確認事項は [RUNBOOK](../docs/RUNBOOK.md#github-ブランチ保護) を参照。通常の承認人数 0 人でも PR は必須で、管理者にも適用される。Issue #45 で聖域の CODEOWNERS 承認必須を定義した。2026-11-16 に PR #53（9590faa）の HCP 反映・受け入れ確認 1〜4 を完了した。PR #54 は承認前 BLOCKED → 大野の承認後 CLEAN、PR #55 は承認なし CLEAN、両 HCP plan は No changes。運用・対象 SHA・日時・run と確認者は [RUNBOOK](../docs/RUNBOOK.md#聖域の承認issue-45) を参照する。
 
 初回導入の PR は plan 結果を本文に記載した時点で人間の承認待ちとする。マージすると Auto-apply が動くため、エージェントはマージしない。apply 後の受け入れ確認は [RUNBOOK](../docs/RUNBOOK.md#github-ブランチ保護) に従う。
 
