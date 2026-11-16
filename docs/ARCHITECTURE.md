@@ -62,3 +62,4 @@ HCP の認証用環境変数と、サイトへ渡す環境変数は別物。HCP 
 ## Notion の位置付け
 
 README は設計書・マイルストーンの管理先として Notion を挙げている。Notion CMS を本命とする方針は [ADR-006](DECISIONS.md#adr-006-notion-cms-を本命とする) に記録するが、現時点で SDK・データ取得・再ビルド連携は実装されていない。構成図に CMS の通信経路は含めない。Notion 更新は Issue #7 の別担当作業。
+
