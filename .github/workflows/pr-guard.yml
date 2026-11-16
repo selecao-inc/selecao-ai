@@ -1,0 +1,35 @@
+name: pr-guard
+
+# PR と Issue の対応と、変更してよい範囲を判定する（Issue #46）。規則は docs/factory/verification.md。
+# ci とは別のチェックにする: PR 本文の編集（edited）でも判定をやり直す必要があり、
+# ci に入れると本文の編集のたびに build まで走るため
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: pr-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Node の版は package.json の engines.node を単一ソースにする。
+      # 判定スクリプトは依存パッケージを持たないので pnpm install は不要
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+
+      - name: PR と Issue の対応・変更範囲を判定する
+        run: node .github/scripts/pr-guard.mts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}

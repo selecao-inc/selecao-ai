@@ -6,7 +6,7 @@
 
 ## GitHub ブランチ保護
 
-`infra/github.tf` で既存の `selecao-inc/selecao-ai` を import し、main を保護する。PR 必須・必須チェック `ci`・通常の承認人数 0 人・聖域の CODEOWNERS 承認必須・管理者にも適用・force push / 削除禁止。マージ方法は Squash のみで、マージ後に作業ブランチを自動削除する。
+`infra/github.tf` で既存の `selecao-inc/selecao-ai` を import し、main を保護する。PR 必須・必須チェック `ci` と `pr-guard`（Issue #46。規則は [verification.md](factory/verification.md#pr-の識別と変更範囲の判定issue-46)）・通常の承認人数 0 人・聖域の CODEOWNERS 承認必須・管理者にも適用・force push / 削除禁止。マージ方法は Squash のみで、マージ後に作業ブランチを自動削除する。
 
 `infra/` を変更していない [PR #20](https://github.com/selecao-inc/selecao-ai/pull/20)・[PR #21](https://github.com/selecao-inc/selecao-ai/pull/21) でも、`Terraform Cloud/selecao-inc/...` チェックが実行され、成功した（2026-10-21）。HCP の VCS トリガー設定は未確認で、全 PR での実行条件は確認できていないため、必須チェックは引き続き `ci` のみとする。`infra/` の変更時は HCP の plan をレビューする。
 
@@ -87,7 +87,7 @@ CI 障害または CODEOWNERS の承認不能で全員がマージできない�
 5. plan を確認・承認した人間が HCP で **Plan and apply (standard)** を実行して保護を戻す。Auto-apply ON のため、この run は plan 成功後に自動反映される。事前確認には必ず Plan only を使う
 6. GitHub 上で管理者への適用・必須チェック `ci`・CODEOWNERS 承認要件が Terraform の定義どおりに復元され、HCP の Plan only が差分ゼロになることを確認して PR に記録する
 
-`.github/workflows/ci.yml` の job 名（必須チェック名）を変えるときは、`infra/github.tf` の `required_status_checks.contexts` も同じ PR で変更する。移行 PR 自体は旧チェック名が必須なので、保護の更新が反映されるまでは旧チェックも成功させる。
+`pr-guard` を必須にした反映（HCP apply）の時点で開いている PR は、`pr-guard` の結果が無いため、次の push か本文の編集で判定が走るまでマージできない。`.github/workflows/ci.yml`・`pr-guard.yml` の job 名（必須チェック名）を変えるときは、`infra/github.tf` の `required_status_checks.contexts` も同じ PR で変更する。移行 PR 自体は旧チェック名が必須なので、保護の更新が反映されるまでは旧チェックも成功させる。
 
 HCP Terraform のアカウント（大野）は 2026-11-16 に HCP の GitHub ログイン（`YusukeOhno16`）に紐付け済み（大野確認）。今後は GitHub でサインインする。メールとパスワードでのサインインは 2027-01-31 に終了するが、紐付け済みのため影響しない。Issue #19 のトークン更新でサインインするときもこの方法を使う。
 

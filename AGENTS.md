@@ -13,7 +13,7 @@ AI エージェントはこのファイルのルールに従って作業する�
 ## ルール
 
 1. **1 PR = 1 Issue = 1 目的**。Issue に書かれた範囲だけを変更する。無関係なリファクタ・整形・改善を混ぜない
-2. **main に直接 push しない**。作業ブランチ（`feat/` `fix/` `infra/` `docs/` `chore/`）から PR を出す。マージは人間が行う
+2. **main に直接 push しない**。作業ブランチから PR を出す。ブランチ名に `issue-<Issue番号>-` を含め（例 `YusukeOhno16/issue-41-content-loader`）、PR 本文の `Closes #<Issue番号>` と一致させる（必須チェック `pr-guard` が判定する。規則は `docs/factory/verification.md`）。マージは人間が行う
 3. **過剰実装しない**。将来用のコード・不要な抽象化・ラッパーを作らない。必要になった時点で足す
 4. **依存は固定版**で追加する（`pnpm add -E`。`^` `~` を付けない）。更新は Dependabot の PR で行う
 5. **版の指定元は1か所**：Node = `package.json` の `engines.node`、pnpm = `packageManager`。`.nvmrc` 等を別に作らない
