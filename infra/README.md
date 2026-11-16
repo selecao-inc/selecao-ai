@@ -8,7 +8,7 @@ state と実行は HCP Terraform（Organization `selecao-inc` / Workspace `selec
 | リソース | 内容 |
 |---|---|
 | `github_repository.site` | 既存の `selecao-inc/selecao-ai` を import。説明・既存機能を保持、Squash のみ許可、マージ後のブランチ自動削除 |
-| `github_branch_protection.main` | PR 必須・必須チェック `ci`・承認 0 人・管理者にも適用・force push / 削除禁止 |
+| `github_branch_protection.main` | PR 必須・必須チェック `ci`・通常の承認人数 0 人・聖域の CODEOWNERS 承認必須・管理者にも適用・force push / 削除禁止 |
 | `vercel_project.site` | `selecao-ai`・Next.js・Git 連携 `selecao-inc/selecao-ai`・本番ブランチ `main` |
 | `vercel_project_domain.apex` | `selecao.ai` |
 | `vercel_project_domain.www` | `www.selecao.ai` → `selecao.ai` へ転送 |
@@ -28,7 +28,7 @@ DNS はお名前.com で手作業管理（[docs/RUNBOOK.md](../docs/RUNBOOK.md)�
 
 `github.tf` の `import` ブロックは既存の `selecao-ai` を対象とする。初回 plan では repository の import と設定更新、main の保護作成が表示される。取り込みは承認後の HCP apply で行うため、手元で `terraform import` を実行しない。import ブロックは取り込み後も残せる。
 
-必須チェックは `ci` のみ。HCP Terraform のチェックは全 PR での実行条件が未確認のため必須化せず、`infra/` の変更時は plan をレビューする。`infra/` を変更しない PR でのチェック実行例と未確認事項は [RUNBOOK](../docs/RUNBOOK.md#github-ブランチ保護) を参照。承認人数 0 人でも PR は必須で、管理者にも適用される。
+必須チェックは `ci` のみ。HCP Terraform のチェックは全 PR での実行条件が未確認のため必須化せず、`infra/` の変更時は plan をレビューする。`infra/` を変更しない PR でのチェック実行例と未確認事項は [RUNBOOK](../docs/RUNBOOK.md#github-ブランチ保護) を参照。通常の承認人数 0 人でも PR は必須で、管理者にも適用される。Issue #45 で聖域の CODEOWNERS 承認必須を定義した。HCP 反映・受け入れ確認は未完了であり、運用と確認状況は [RUNBOOK](../docs/RUNBOOK.md#聖域の承認issue-45) を参照する。
 
 初回導入の PR は plan 結果を本文に記載した時点で人間の承認待ちとする。マージすると Auto-apply が動くため、エージェントはマージしない。apply 後の受け入れ確認は [RUNBOOK](../docs/RUNBOOK.md#github-ブランチ保護) に従う。
 
