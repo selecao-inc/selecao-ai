@@ -2,7 +2,7 @@
 
 運用手順。全体構成は [ARCHITECTURE](ARCHITECTURE.md)、決定事項は [DECISIONS](DECISIONS.md)、インフラ定義・セットアップは [infra/README.md](../infra/README.md)。
 
-既存の DNS・ブランチ保護の記録は確認日の時点のもの。以下の運用手順は文書化のみで、環境変数の追加・削除、ドメイン変更、Rollback、HCP 操作の実地検証は今回行っていない。実施時は人間の承認を得て、対象 commit・plan・反映結果を PR に記録する。
+既存の DNS・ブランチ保護の記録は確認日の時点のもの。環境変数の追加・削除、ドメイン変更、Rollback の手順は文書化のみ。HCP 操作とブランチ保護の確認結果は、各節の確認日・実施者・run を参照する。実施時は人間の承認を得て、対象 commit・plan・反映結果を PR に記録する。
 
 ## GitHub ブランチ保護
 
@@ -14,16 +14,24 @@
 
 `.github/CODEOWNERS` は `/tests/scenarios/`・`/docs/factory/`・`/.github/`・`/infra/`・`/AGENTS.md` の所有者を `@YusukeOhno16` にする。CODEOWNERS 自体も `/.github/` に含まれる。Terraform は `require_code_owner_reviews = true` とし、`required_approving_review_count = 0`・`enforce_admins = true` を維持する。聖域以外の PR に一般の承認人数は要求しない。当面、マージ操作は全 PR で人が行う。
 
-定義は実装済みだが、HCP の反映・承認の強制は未確認。大野が対象 SHA の HCP plan を確認し、main の保護設定だけが変更されることを承認してからマージする。ローカルで `terraform apply` は実行しない。
+2026-11-16、PR #53 が main に入り、HCP 反映・受け入れ確認 1〜4 を完了した。main の対象 SHA は `9590faae80f2b16267085a7662da826731dc77cd`。大野の HCP セッションで Claude が run `run-d9qDqMEyRzNDvK9f` の **Applied** を確認した（大野から共有された確認結果）。同じ確認で API から取得した main の保護は `require_code_owner_reviews=true`・`required_approving_review_count=0`・`enforce_admins=true`・`contexts=[ci]`。ローカル apply は実行していない。
 
-反映後、大野の指示を受けて次を確認し、対象 SHA・テスト PR 番号・CI・承認前後の状態・HCP run と結果をこの節と Issue #45 に記録する。テスト PR はマージせずクローズする。
+以下の日時は UTC。GitHub の状態は Codex が `gh pr view --json mergeStateStatus,reviewDecision,reviews,statusCheckRollup` で取得した。HCP の plan 内容と承認前の GitHub 画面は、大野のセッションで Claude が確認し、大野が結果を共有した。HCP 確認日は 2026-11-16（確認時刻は未記録）。テスト PR は両方とも bot `selecao-agents` が作成し、結果コメント後にマージせずクローズ、テスト用のローカル・リモートブランチも削除した。
 
-| 受け入れ確認 | 状態 |
+| 受け入れ確認 | 実施結果（pass） |
 |---|---|
-| 1. bot の聖域変更 PR は、`ci` 成功後も大野の承認前は `BLOCKED` | 未実施（反映後の指示待ち） |
-| 2. 1 の PR を大野が承認するとマージ可能になる | 未実施（反映後の指示待ち） |
-| 3. bot の聖域以外だけの PR（例: `docs/ARCHITECTURE.md`）は、承認なしでも `ci` 成功でマージ可能になる | 未実施（反映後の指示待ち） |
-| 4. HCP の Plan only が差分ゼロになる | 未実施（反映後の指示待ち） |
+| 1. 聖域 PR が承認前は `BLOCKED` | PR #54、SHA `be112efcc97ec58716f93f28cc887509e03c32f3`。2026-11-16 12:30:53Z、`ci=SUCCESS`・レビュー0件・`mergeStateStatus=BLOCKED`。画面では「Merging is blocked — Waiting on code owner review from YusukeOhno16」「Code owner review required by reviewers with write access」を確認し、`requested_reviewers=YusukeOhno16` として code owner に自動依頼されていた。HCP: `run-CUY4ob5PHo7bmFzX`（確認4参照） |
+| 2. 大野の承認後はマージ可能 | PR #54、同じ SHA。`YusukeOhno16=APPROVED`（2026-11-16 12:38:22Z）、12:40:01Z の再取得で `mergeStateStatus=CLEAN`・`ci=SUCCESS`。マージ操作は実施せずクローズ |
+| 3. 聖域以外は承認なしでマージ可能 | PR #55、SHA `db44bb40cef623ec0c8b9cc99527d39ac5638777`。2026-11-16 12:30:54Z、`ci=SUCCESS`・レビュー0件・`mergeStateStatus=CLEAN`。12:40:02Z にも同じ状態を再確認。マージせずクローズ。HCP: `run-tT6WYd8RuBXGh6Si`（確認4参照） |
+| 4. HCP の plan が差分ゼロ | 2026-11-16、Claude が大野の HCP セッションで PR #54（`be112ef`）の `run-CUY4ob5PHo7bmFzX` と PR #55（`db44bb4`）の `run-tT6WYd8RuBXGh6Si` を確認。両方 **No changes（0 added / 0 updated / 0 removed）**。GitHub commit statuses も両 SHA で `state=success`・`description=Success`（それぞれ 12:30:30Z / 12:30:49Z） |
+
+承認人数 0 の設定では `reviewDecision` は承認前後とも空文字（`REVIEW_REQUIRED` にはならない）だった。これだけで承認不要とは判定しない。聖域 PR の画面上の code owner 承認要求、レビュー自動依頼、および `ci` 成功後の承認前 `BLOCKED` → 大野の承認後 `CLEAN` により、CODEOWNERS 承認の強制を確認した。
+
+テスト PR と結果コメント:
+
+https://github.com/selecao-inc/selecao-ai/pull/54#issuecomment-6916679654
+
+https://github.com/selecao-inc/selecao-ai/pull/55#issuecomment-6916680112
 
 承認人数 0 のままで CODEOWNERS 承認が強制されないと判明したら停止して大野へ返す。全 PR の承認必須化へ無断で切り替えない。
 
@@ -80,6 +88,8 @@ CI 障害または CODEOWNERS の承認不能で全員がマージできない�
 6. GitHub 上で管理者への適用・必須チェック `ci`・CODEOWNERS 承認要件が Terraform の定義どおりに復元され、HCP の Plan only が差分ゼロになることを確認して PR に記録する
 
 `.github/workflows/ci.yml` の job 名（必須チェック名）を変えるときは、`infra/github.tf` の `required_status_checks.contexts` も同じ PR で変更する。移行 PR 自体は旧チェック名が必須なので、保護の更新が反映されるまでは旧チェックも成功させる。
+
+HCP Terraform のアカウント（大野）は 2026-11-16 に HCP の GitHub ログイン（`YusukeOhno16`）に紐付け済み（大野確認）。今後は GitHub でサインインする。メールとパスワードでのサインインは 2027-01-31 に終了するが、紐付け済みのため影響しない。Issue #19 のトークン更新でサインインするときもこの方法を使う。
 
 HCP の run の種類・手動実行の仕様は [Run modes and options](https://developer.hashicorp.com/terraform/cloud-docs/workspaces/run/modes-and-options) と [UI and VCS-driven run workflow](https://developer.hashicorp.com/terraform/cloud-docs/workspaces/run/ui) を参照。
 
