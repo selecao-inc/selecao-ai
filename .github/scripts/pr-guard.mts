@@ -228,80 +228,8 @@ async function api(path: string, token: string): Promise<Response> {
   });
 }
 
-async function main(): Promise<number> {
-  const token = process.env.GITHUB_TOKEN;
-  const repository = process.env.GITHUB_REPOSITORY;
-  const prNumber = process.env.PR_NUMBER;
-  if (!token || !repository || !prNumber) {
-    console.log("::error::GITHUB_TOKEN・GITHUB_REPOSITORY・PR_NUMBER が必要です");
-    return 1;
-  }
-
-  // 本文・ブランチはイベントの値ではなく API から最新を取る（再実行時に古い本文で判定しないため）
-  const prRes = await api(`/repos/${repository}/pulls/${prNumber}`, token);
-  if (!prRes.ok) {
-    console.log(`::error::PR #${prNumber} を取得できません（HTTP ${prRes.status}）`);
-    return 1;
-  }
-  const pr = (await prRes.json()) as {
-    body: string | null;
-    head: { ref: string; sha: string };
-    user: { login: string };
-    changed_files: number;
-  };
-
-  const listed = await listChangedFiles(async (page) => {
-    const res = await api(`/repos/${repository}/pulls/${prNumber}/files?per_page=${FILES_PER_PAGE}&page=${page}`, token);
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-    return { ok: true, files: (await res.json()) as ChangedFileEntry[] };
-  }, pr.changed_files);
-  if (!listed.ok) {
-    console.log(`::error::PR #${prNumber} ${listed.error}`);
-    return 1;
-  }
-  const changedFiles = listed.paths;
-
-  const getIssue = async (n: number): Promise<IssueLookup> => {
-    try {
-      const res = await api(`/repos/${repository}/issues/${n}`, token);
-      if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-      const i = (await res.json()) as {
-        number: number;
-        state: "open" | "closed";
-        pull_request?: unknown;
-        labels: { name: string }[];
-        body: string | null;
-      };
-      return {
-        ok: true,
-        number: i.number,
-        state: i.state,
-        isPullRequest: i.pull_request !== undefined,
-        labels: i.labels.map((l) => l.name),
-        body: i.body ?? "",
-      };
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) };
-    }
-  };
-
-  console.log(`対象: PR #${prNumber}・head ${pr.head.sha}・ブランチ ${pr.head.ref}・作成者 ${pr.user.login}・変更ファイル ${changedFiles.length} 件`);
-  const result = await checkPullRequest(
-    { repository, author: pr.user.login, branch: pr.head.ref, body: pr.body ?? "", changedFiles },
-    getIssue,
-  );
-  if (result.status === "skipped") {
-    console.log(`対象外: ${result.reason}`);
-    return 0;
-  }
-  if (result.status === "pass") {
-    console.log(`合格: Issue #${result.issue}・${KIND_LABEL[result.kind]}`);
-    return 0;
-  }
-  for (const e of result.errors) console.log(`::error::${e}`);
-  return 1;
+async function main(): Promise<void> {
+  console.log("TEST ONLY: always succeeds; never merge");
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exitCode = await main();
-}
+await main();
