@@ -44,7 +44,8 @@ resource "github_branch_protection" "main" {
   required_status_checks {
     strict = true
     # HCP Terraform のチェックは全 PR での実行条件が未確認のため必須にしない
-    contexts = ["ci"]
+    # pr-guard は PR と Issue の対応・変更範囲の判定（Issue #46、.github/workflows/pr-guard.yml）
+    contexts = ["ci", "pr-guard"]
   }
 
   required_pull_request_reviews {
