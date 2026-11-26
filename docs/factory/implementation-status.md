@@ -11,7 +11,7 @@ Issue #32 は設計書・AGENTS.md の入口リンク・ADR の追加までと�
 | リポジトリの作業ルール | [AGENTS.md](../../AGENTS.md) |
 | 指示ファイル検出、install・lint・typecheck・test・build | [CI](../../.github/workflows/ci.yml) |
 | 聖域の所有者を `@YusukeOhno16` にする定義 | [CODEOWNERS](../../.github/CODEOWNERS)。Issue #45 で実装済み |
-| PR と Issue の対応・変更範囲の判定（必須チェック `pr-guard`） | [ワークフロー](../../.github/workflows/pr-guard.yml)・[判定スクリプト](../../.github/scripts/pr-guard.mts)。規則・ラベルの意味・対応表は [verification.md](verification.md#pr-の識別と変更範囲の判定issue-46)。Issue #46 で実装（受け入れ確認はマージ・反映後） |
+| PR と Issue の対応・変更範囲の判定（必須チェック `pr-guard`） | [ワークフロー](../../.github/workflows/pr-guard.yml)・[判定スクリプト](../../.github/scripts/pr-guard.mts)。規則・ラベルの意味・対応表は [verification.md](verification.md#pr-の識別と変更範囲の判定issue-46)。Issue #46（PR #57）で実装。2026-11-26、Issue #60 の受け入れ確認1〜6を完了（[結果](../RUNBOOK.md#pr-guard-の受け入れ確認issue-60)） |
 | PR 必須・必須チェック `ci`・`pr-guard`・CODEOWNERS 承認必須を含む main 保護の定義 | [Terraform](../../infra/github.tf)。既存の運用記録は [RUNBOOK](../RUNBOOK.md#github-ブランチ保護) |
 
 Issue #45 で CODEOWNERS と承認必須化を実装し、2026-11-16 に HCP 反映・受け入れ確認 1〜4 を完了した。一般の承認人数 0 人・管理者への適用を維持し、PR #54 の承認前 BLOCKED → 大野の承認後 CLEAN、PR #55 の承認なし CLEAN と、両 HCP plan の No changes を確認した。結果と証拠の確認者は [RUNBOOK](../RUNBOOK.md#聖域の承認issue-45) と Issue #45 に記録する。AI 用アカウントは #44、運用とトークン更新 #52 は [RUNBOOK](../RUNBOOK.md#ai-用-github-アカウントの運用) を参照。
@@ -35,7 +35,7 @@ Issue #45 で CODEOWNERS と承認必須化を実装し、2026-11-16 に HCP 反
 | 候補となる成果物 | 対象・確認したい完了条件 |
 |---|---|
 | 計画の保存・運用形式 | `docs/exec-plans/` の計画を次工程へ渡せる |
-| 変更検出 CI（#46、実装済み・受け入れ確認待ち） | PR の識別とシナリオ・工場の仕組みの変更範囲を必須チェック `pr-guard` で判定する。受け入れ確認（`Closes` の無い PR・`tests/scenarios/` に触れる実装 PR・判定器とワークフローを改変した実装 PR が失敗、規則を守った PR が成功、本文の編集で再判定）はマージと HCP 反映の後に行い、結果を記録する |
+| 変更検出 CI（#46・#60、受け入れ確認完了） | PR の識別・変更範囲を必須チェック `pr-guard` で判定する。2026-11-26、PR #64〜#66 で #60 の確認1〜6を完了。ci 成功時の規則1・4による停止、正常 PR の CLEAN、同一 head の本文削除・復元、新 head への新しい判定を確認（[証拠](../RUNBOOK.md#pr-guard-の受け入れ確認issue-60)）。大野指示で #58 に先行。Actions policy 設定後と 12/02 以降の起動確認は #58 で行う |
 | 合格シナリオの実行（#47） | 実装前は main の必須 CI を壊さず、実装 PR で必要なシナリオが必ず実行される |
 | CODEOWNERS と承認必須化（#45、反映・受け入れ確認完了） | PR #53（9590faa）の反映後、PR #54・#55 で承認の強制と HCP 差分ゼロを確認済み（2026-11-16）。同じ Mac の認証情報の隔離は #51 の後続判断 |
 | 工場長の進行手順 | 分解・依存関係・変更ファイルの重なりから並行可否・統合順を決め、依存先と停止・再開の判断を記録できる |
