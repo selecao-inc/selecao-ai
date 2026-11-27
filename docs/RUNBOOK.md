@@ -181,6 +181,37 @@ GitHub は 2026-12-02 から、適用できる Actions event policy が無い pu
 
 `pr-guard` が起動しない（T0 以降の run が作られずチェックが古い run のまま、または `Event 'pull_request_target' is not allowed` のようなエラーで失敗する）場合は、まず **Policies** で policy の対象と許可イベントを確認・修正する。修正できない間に緊急でマージが必要なら、[break-glass](#ci-障害時の-break-glass) の手順で `pr-guard` を必須チェックから一時的に外す。
 
+#### 設定と確認の記録
+
+**設定**（2026-11-27 09:34 JST = 00:34:17Z、大野が画面で作成）。内容は管理者名義の `GET /repos/selecao-inc/selecao-ai/actions/policies/17933` で確認した（大野確認。bot は admin でないため取得できない）。
+
+| 項目 | 値 |
+|---|---|
+| policy id | `17933` |
+| 名前 | `pr-guard-pull-request-target` |
+| enforcement | `active` |
+| 対象（`workflow_path`） | include `.github/workflows/pr-guard.yml`、exclude なし |
+| rule | `restrict_action_events`、`allowed_events` は `pull_request_target` のみ |
+| 既定の policy | 一覧に表示されず、リポジトリの policy は `total_count` 1（この policy のみ） |
+
+**設定後の起動**（[照合](#対象-pr-の-pr-guard-の-run-を照合する)の手順による）。トリガー直前の時刻（T0）は記録していなかったため、policy の作成時刻を基準に `created_at` を照合した。
+
+| 項目 | 値 |
+|---|---|
+| 対象 PR・操作 | PR #68 への push（policy 作成後） |
+| 対象 PR の head SHA | `3a95a644a25e189b9fce6411d45d6fdd5367e936` |
+| run | `45924767296`（https://github.com/selecao-inc/selecao-ai/actions/runs/45924767296）。`gh pr checks 68` の `pr-guard` はこの run を指す |
+| `created_at` | `2026-11-27T01:49:30Z`（policy 作成の 00:34:17Z より後） |
+| `pull_requests[].number` | `68` |
+| `path` | `.github/workflows/pr-guard.yml` |
+| `event` | `pull_request_target` |
+| `conclusion` | `success` |
+
+**未確認**:
+
+- Policy insights の画面は見ていない
+- 2026-12-02 以降の最初の PR での確認は、[上の手順](#2026-12-02-以降の最初の-pr-での確認)で今後行い、Issue #58 に記録する
+
 ## DNS（お名前.com）
 
 `selecao.ai` の DNS はお名前.com（ネームサーバー `01〜04.dnsv.jp`）で手作業管理する。Terraform では管理しない。
