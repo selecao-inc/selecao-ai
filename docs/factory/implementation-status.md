@@ -13,6 +13,7 @@ Issue #32 は設計書・AGENTS.md の入口リンク・ADR の追加までと�
 | 聖域の所有者を `@YusukeOhno16` にする定義 | [CODEOWNERS](../../.github/CODEOWNERS)。Issue #45 で実装済み |
 | PR と Issue の対応・変更範囲の判定（必須チェック `pr-guard`） | [ワークフロー](../../.github/workflows/pr-guard.yml)・[判定スクリプト](../../.github/scripts/pr-guard.mts)。規則・ラベルの意味・対応表は [verification.md](verification.md#pr-の識別と変更範囲の判定issue-46)。Issue #46（PR #57）で実装。2026-11-26、Issue #60 の受け入れ確認1〜6を完了（[結果](../RUNBOOK.md#pr-guard-の受け入れ確認issue-60)） |
 | PR 必須・必須チェック `ci`・`pr-guard`・CODEOWNERS 承認必須を含む main 保護の定義 | [Terraform](../../infra/github.tf)。既存の運用記録は [RUNBOOK](../RUNBOOK.md#github-ブランチ保護) |
+| シナリオの選択・実行と必須チェック `scenarios` の追加定義（Issue #47 / PR #69） | `.github/workflows/scenarios.yml`、`.github/scripts/scenario-runner.mts`、`tests/scenarios/` の共通設定。レビュー後の追加決定として factory の聖域パス判定と、factory / Dependabot の両型の completed 回帰を実装。追加修正版は push 承認前で、旧 head の CI 成功と区別する。HCP の Dependabot secrets 権限追加・反映・実サービス受け入れ・必須化は未確認 |
 
 Issue #45 で CODEOWNERS と承認必須化を実装し、2026-11-16 に HCP 反映・受け入れ確認 1〜4 を完了した。一般の承認人数 0 人・管理者への適用を維持し、PR #54 の承認前 BLOCKED → 大野の承認後 CLEAN、PR #55 の承認なし CLEAN と、両 HCP plan の No changes を確認した。結果と証拠の確認者は [RUNBOOK](../RUNBOOK.md#聖域の承認issue-45) と Issue #45 に記録する。AI 用アカウントは #44、運用とトークン更新 #52 は [RUNBOOK](../RUNBOOK.md#ai-用-github-アカウントの運用) を参照。
 
@@ -23,7 +24,7 @@ Issue #45 で CODEOWNERS と承認必須化を実装し、2026-11-16 に HCP 反
 | 未決の内容 | 後続候補 |
 |---|---|
 | モデル名・版の最終選定。シナリオ作成・検証・振り返り、Gemini の具体的な割り当て | 担当割り当てとレビュー分離 |
-| 実装前のシナリオと必須 CI を両立する方式、シナリオの無い実装 PR の扱い（PR の識別と判定に影響するファイルの対応表は #46 で決定） | 合格シナリオの実行（#47） |
+| #47 の実 PR 受け入れ確認・HCP 反映。方式と0件の扱いは2026-11-27大野決定を verification.md に記録 | 合格シナリオの実行（#47） |
 | 危険度の完全なパス対応表と対象外パスの扱い | 危険度の機械判定 |
 | 停止回数と結果分類の詳細な記録形式、同じ CI 失敗の識別方法 | 停止条件と結果の記録 |
 | 指標の保存先・集計期間・所要時間の計測区間・数値目標、軽・中の自動マージ移行時期・基準 | 指標の収集・振り返り |

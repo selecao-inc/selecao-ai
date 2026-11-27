@@ -8,11 +8,13 @@ state と実行は HCP Terraform（Organization `selecao-inc` / Workspace `selec
 | リソース | 内容 |
 |---|---|
 | `github_repository.site` | 既存の `selecao-inc/selecao-ai` を import。説明・既存機能を保持、Squash のみ許可、マージ後のブランチ自動削除 |
-| `github_branch_protection.main` | PR 必須・必須チェック `ci`・通常の承認人数 0 人・聖域の CODEOWNERS 承認必須・管理者にも適用・force push / 削除禁止 |
+| `github_branch_protection.main` | PR 必須・必須チェック `ci` / `pr-guard` / `scenarios`（#47 の追加分は HCP 反映未確認）・通常の承認人数 0 人・聖域の CODEOWNERS 承認必須・管理者にも適用・force push / 削除禁止 |
 | `vercel_project.site` | `selecao-ai`・Next.js・Git 連携 `selecao-inc/selecao-ai`・本番ブランチ `main` |
 | `vercel_project_domain.apex` | `selecao.ai` |
 | `vercel_project_domain.www` | `www.selecao.ai` → `selecao.ai` へ転送 |
 | `vercel_project_environment_variable.secret` | `secrets.enc.yaml` の key/value を本番・プレビューへ投入（M1 は 0 件） |
+| `github_actions_secret.scenario_bypass` | SOPS の CI 予約キーがある場合だけ GitHub Actions secret に渡す。Vercel 環境変数の一覧からは除外 |
+| `github_dependabot_secret.scenario_bypass` | 同じ SOPS 予約キーを Dependabot secret にも渡し、依存更新 PR で Preview の回帰を実行する |
 
 DNS はお名前.com で手作業管理（[docs/RUNBOOK.md](../docs/RUNBOOK.md)）。
 
@@ -28,7 +30,7 @@ DNS はお名前.com で手作業管理（[docs/RUNBOOK.md](../docs/RUNBOOK.md)�
 
 `github.tf` の `import` ブロックは既存の `selecao-ai` を対象とする。初回 plan では repository の import と設定更新、main の保護作成が表示される。取り込みは承認後の HCP apply で行うため、手元で `terraform import` を実行しない。import ブロックは取り込み後も残せる。
 
-必須チェックは `ci` のみ。HCP Terraform のチェックは全 PR での実行条件が未確認のため必須化せず、`infra/` の変更時は plan をレビューする。`infra/` を変更しない PR でのチェック実行例と未確認事項は [RUNBOOK](../docs/RUNBOOK.md#github-ブランチ保護) を参照。通常の承認人数 0 人でも PR は必須で、管理者にも適用される。Issue #45 で聖域の CODEOWNERS 承認必須を定義した。2026-11-16 に PR #53（9590faa）の HCP 反映・受け入れ確認 1〜4 を完了した。PR #54 は承認前 BLOCKED → 大野の承認後 CLEAN、PR #55 は承認なし CLEAN、両 HCP plan は No changes。運用・対象 SHA・日時・run と確認者は [RUNBOOK](../docs/RUNBOOK.md#聖域の承認issue-45) を参照する。
+必須チェックの定義は `github.tf` を正とし、追加後は HCP 反映と GitHub 必須欄を確認する。HCP Terraform のチェックは全 PR での実行条件が未確認のため必須化せず、`infra/` の変更時は plan をレビューする。`infra/` を変更しない PR でのチェック実行例と未確認事項は [RUNBOOK](../docs/RUNBOOK.md#github-ブランチ保護) を参照。通常の承認人数 0 人でも PR は必須で、管理者にも適用される。Issue #45 で聖域の CODEOWNERS 承認必須を定義した。2026-11-16 に PR #53（9590faa）の HCP 反映・受け入れ確認 1〜4 を完了した。PR #54 は承認前 BLOCKED → 大野の承認後 CLEAN、PR #55 は承認なし CLEAN、両 HCP plan は No changes。運用・対象 SHA・日時・run と確認者は [RUNBOOK](../docs/RUNBOOK.md#聖域の承認issue-45) を参照する。
 
 初回導入の PR は plan 結果を本文に記載した時点で人間の承認待ちとする。マージすると Auto-apply が動くため、エージェントはマージしない。apply 後の受け入れ確認は [RUNBOOK](../docs/RUNBOOK.md#github-ブランチ保護) に従う。
 
@@ -95,7 +97,7 @@ export SOPS_AGE_KEY_FILE="$HOME/.config/sops/age/keys.txt"
    sops secrets.enc.yaml
    ```
 
-   形式はフラットな key/value。key がそのまま Vercel の環境変数名になる。
+   形式はフラットな key/value。通常の key がそのまま Vercel の環境変数名になる。予約キー `GITHUB_ACTIONS_VERCEL_AUTOMATION_BYPASS_SECRET` だけは GitHub Actions 専用で、Vercel 環境変数の投入対象から除く。bypass の発行・SOPS 初回登録・HCP の追加権限は `docs/RUNBOOK.md` の「シナリオ CI の導入と bypass 登録」を参照。
 
    ```yaml
    EXAMPLE_API_KEY: "..."

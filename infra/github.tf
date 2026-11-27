@@ -45,11 +45,43 @@ resource "github_branch_protection" "main" {
     strict = true
     # HCP Terraform のチェックは全 PR での実行条件が未確認のため必須にしない
     # pr-guard は PR と Issue の対応・変更範囲の判定（Issue #46、.github/workflows/pr-guard.yml）
-    contexts = ["ci", "pr-guard"]
+    contexts = ["ci", "pr-guard", "scenarios"]
   }
 
   required_pull_request_reviews {
     required_approving_review_count = 0
     require_code_owner_reviews      = true
+  }
+}
+
+# 鍵が未登録なら作成しない。復号値を output や Vercel の環境変数へ流さない。
+resource "github_actions_secret" "scenario_bypass" {
+  for_each = setintersection(nonsensitive(toset(keys(data.sops_file.secrets.data))), toset(["GITHUB_ACTIONS_VERCEL_AUTOMATION_BYPASS_SECRET"]))
+
+  repository  = github_repository.site.name
+  secret_name = "VERCEL_AUTOMATION_BYPASS_SECRET"
+  value       = data.sops_file.secrets.data[each.key]
+
+  lifecycle {
+    precondition {
+      condition     = length(trimspace(data.sops_file.secrets.data[each.key])) > 0
+      error_message = "CI bypass の予約キーには空でない鍵を設定してください。"
+    }
+  }
+}
+
+# Dependabot の pull_request run は Actions secrets を使えないため、同じ予約キーを専用 store にも渡す。
+resource "github_dependabot_secret" "scenario_bypass" {
+  for_each = setintersection(nonsensitive(toset(keys(data.sops_file.secrets.data))), toset(["GITHUB_ACTIONS_VERCEL_AUTOMATION_BYPASS_SECRET"]))
+
+  repository  = github_repository.site.name
+  secret_name = "VERCEL_AUTOMATION_BYPASS_SECRET"
+  value       = data.sops_file.secrets.data[each.key]
+
+  lifecycle {
+    precondition {
+      condition     = length(trimspace(data.sops_file.secrets.data[each.key])) > 0
+      error_message = "Dependabot bypass の予約キーには空でない鍵を設定してください。"
+    }
   }
 }

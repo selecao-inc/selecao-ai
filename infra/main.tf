@@ -7,6 +7,11 @@ resource "vercel_project" "site" {
   name      = "selecao-ai"
   framework = "nextjs"
 
+  # 同じ SHA の Preview を GitHub Deployments / statuses から検証するために必要。
+  git_provider_options = {
+    create_deployments = true
+  }
+
   git_repository = {
     type              = "github"
     repo              = "selecao-inc/selecao-ai"
@@ -35,7 +40,8 @@ data "sops_file" "secrets" {
 
 resource "vercel_project_environment_variable" "secret" {
   # 値は sensitive のまま、キー名だけを for_each に使う（キー名は秘密ではない前提）
-  for_each = nonsensitive(toset(keys(data.sops_file.secrets.data)))
+  # 既存のフラットなキーとリソースアドレスを維持し、CI 専用の予約キーだけ除外する。
+  for_each = setsubtract(nonsensitive(toset(keys(data.sops_file.secrets.data))), toset(["GITHUB_ACTIONS_VERCEL_AUTOMATION_BYPASS_SECRET"]))
 
   project_id = vercel_project.site.id
   key        = each.key
