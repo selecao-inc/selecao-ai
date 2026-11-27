@@ -19,6 +19,10 @@ run "missing_key" {
     error_message = "Missing key must not create a GitHub secret."
   }
   assert {
+    condition     = length(github_dependabot_secret.scenario_bypass) == 0
+    error_message = "Missing key must not create a Dependabot secret."
+  }
+  assert {
     condition     = length(vercel_project_environment_variable.secret) == 0
     error_message = "Empty input must not create Vercel variables."
   }
@@ -42,6 +46,10 @@ run "legacy_keys" {
     condition     = length(github_actions_secret.scenario_bypass) == 0
     error_message = "Legacy-only input must not create a GitHub secret."
   }
+  assert {
+    condition     = length(github_dependabot_secret.scenario_bypass) == 0
+    error_message = "Legacy-only input must not create a Dependabot secret."
+  }
 }
 
 run "reserved_key" {
@@ -59,6 +67,14 @@ run "reserved_key" {
     error_message = "A reserved key must create exactly one GitHub secret."
   }
   assert {
+    condition     = length(github_dependabot_secret.scenario_bypass) == 1
+    error_message = "A reserved key must create exactly one Dependabot secret."
+  }
+  assert {
+    condition     = github_dependabot_secret.scenario_bypass["GITHUB_ACTIONS_VERCEL_AUTOMATION_BYPASS_SECRET"].value == "fixture-bypass"
+    error_message = "The same reserved value must go to Dependabot."
+  }
+  assert {
     condition     = github_actions_secret.scenario_bypass["GITHUB_ACTIONS_VERCEL_AUTOMATION_BYPASS_SECRET"].value == "fixture-bypass"
     error_message = "Reserved value must go to GitHub."
   }
@@ -70,5 +86,5 @@ run "empty_key" {
     target = data.sops_file.secrets
     values = { data = { GITHUB_ACTIONS_VERCEL_AUTOMATION_BYPASS_SECRET = "" } }
   }
-  expect_failures = [github_actions_secret.scenario_bypass]
+  expect_failures = [github_actions_secret.scenario_bypass, github_dependabot_secret.scenario_bypass]
 }

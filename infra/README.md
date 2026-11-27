@@ -14,6 +14,7 @@ state と実行は HCP Terraform（Organization `selecao-inc` / Workspace `selec
 | `vercel_project_domain.www` | `www.selecao.ai` → `selecao.ai` へ転送 |
 | `vercel_project_environment_variable.secret` | `secrets.enc.yaml` の key/value を本番・プレビューへ投入（M1 は 0 件） |
 | `github_actions_secret.scenario_bypass` | SOPS の CI 予約キーがある場合だけ GitHub Actions secret に渡す。Vercel 環境変数の一覧からは除外 |
+| `github_dependabot_secret.scenario_bypass` | 同じ SOPS 予約キーを Dependabot secret にも渡し、依存更新 PR で Preview の回帰を実行する |
 
 DNS はお名前.com で手作業管理（[docs/RUNBOOK.md](../docs/RUNBOOK.md)）。
 

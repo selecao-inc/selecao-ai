@@ -69,3 +69,19 @@ resource "github_actions_secret" "scenario_bypass" {
     }
   }
 }
+
+# Dependabot の pull_request run は Actions secrets を使えないため、同じ予約キーを専用 store にも渡す。
+resource "github_dependabot_secret" "scenario_bypass" {
+  for_each = setintersection(nonsensitive(toset(keys(data.sops_file.secrets.data))), toset(["GITHUB_ACTIONS_VERCEL_AUTOMATION_BYPASS_SECRET"]))
+
+  repository  = github_repository.site.name
+  secret_name = "VERCEL_AUTOMATION_BYPASS_SECRET"
+  value       = data.sops_file.secrets.data[each.key]
+
+  lifecycle {
+    precondition {
+      condition     = length(trimspace(data.sops_file.secrets.data[each.key])) > 0
+      error_message = "Dependabot bypass の予約キーには空でない鍵を設定してください。"
+    }
+  }
+}

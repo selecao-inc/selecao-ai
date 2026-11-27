@@ -15,6 +15,8 @@ export default class ScenarioReporter implements Reporter {
     }
   }
   onTestEnd(test: TestCase, result: TestResult) {
+    // 共通 fixture を通らない expect の失敗（例: 保護ページの検査）は反転しない。
+    if (!test.annotations.some((a) => a.type === "scenario:protected-context")) this.report.error = true;
     const assertion = result.errors.length > 0 && result.errors.every((e) =>
       e.message && this.assertions.get(test.id)?.has(e.message));
     this.report.tests.push({ id: test.id, status: result.status === "passed" ? "passed" :

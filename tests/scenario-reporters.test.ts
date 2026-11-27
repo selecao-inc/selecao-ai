@@ -10,7 +10,7 @@ const root = mkdtempSync(resolve(".scenario-work/reporter-fixtures-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 const harness = process.cwd();
 
-function fixture(engine: "vitest" | "preview", name: string, code: string) {
+function fixture(engine: "vitest" | "preview", name: string, code: string, shared = true) {
   const dir = resolve(root, `${engine}-${name}`);
   const scenarios = resolve(dir, "tests/scenarios");
   mkdirSync(resolve(scenarios, "issue-99999"), { recursive: true });
@@ -19,12 +19,20 @@ function fixture(engine: "vitest" | "preview", name: string, code: string) {
   for (const file of [`${engine}.config.mts`, `${engine}-reporter.mts`]) {
     copyFileSync(resolve(harness, "tests/scenarios", file), resolve(scenarios, file));
   }
+  if (engine === "preview") {
+    copyFileSync(resolve(harness, "tests/scenarios/preview.mts"), resolve(scenarios, "preview.mts"));
+    mkdirSync(resolve(dir, ".github/scripts"), { recursive: true });
+    for (const script of ["scenario-runner.mts", "pr-guard.mts"]) {
+      copyFileSync(resolve(harness, ".github/scripts", script), resolve(dir, ".github/scripts", script));
+    }
+  }
   const file = resolve(scenarios, `issue-99999/a.scenario.${engine === "vitest" ? "test" : "spec"}.ts`);
-  writeFileSync(file, `import { test, expect } from '${engine === "vitest" ? "vitest" : "@playwright/test"}';\n${code}`);
+  writeFileSync(file, `import { test, expect } from '${engine === "vitest" ? "vitest" : shared ? "../preview.mts" : "@playwright/test"}';\n${code}`);
   const output = resolve(dir, "report.json");
   const result = spawnSync(resolve(harness, `node_modules/.bin/${engine === "vitest" ? "vitest" : "playwright"}`),
     [engine === "vitest" ? "run" : "test", "--config", resolve(scenarios, `${engine}.config.mts`)],
-    { cwd: dir, env: { ...process.env, SCENARIO_REPORT: output }, encoding: "utf8", timeout: 30_000 });
+    { cwd: dir, env: { ...process.env, SCENARIO_REPORT: output,
+      PREVIEW_ORIGIN: "https://fixture.vercel.app", VERCEL_AUTOMATION_BYPASS_SECRET: "fixture-key" }, encoding: "utf8", timeout: 30_000 });
   const report = JSON.parse(readFileSync(output, "utf8")) as Report;
   return { report, exit: result.status };
 }
@@ -68,3 +76,9 @@ describe.each(["vitest", "preview"] as const)("%s の実 reporter", (engine) => 
     expect(judgeReports([r], "fail")).toBe(false);
   }, 40_000);
 });
+
+it("共通 fixture を通らない Playwright の expect 失敗を反転しない", () => {
+  const r = fixture("preview", "no-shared-fixture", "test('wrong', () => { expect(1).toBe(2); });", false);
+  expect(r.report.error).toBe(true);
+  expect(judgeReports([r], "fail")).toBe(false);
+}, 40_000);

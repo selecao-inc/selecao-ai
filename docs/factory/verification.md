@@ -91,9 +91,12 @@ Dependabot（作成者 `dependabot[bot]`）の PR は判定の対象外として
 | PR / main | `completed` で閉じた Issue のシナリオは回帰としてすべて成功させる |
 | 無関係の open Issue | 理由をログに出して対象外 |
 | `not_planned` など completed 以外で閉じた Issue / API 取得不能 | 失敗。対象シナリオの整理が必要 |
-| factory（対応 Issue のラベル）/ Dependabot の PR | チェック対象外として成功 |
+| factory（対応 Issue のラベル）の PR | 全変更パスが聖域の場合だけ対象 Issue の要求を免除。聖域外が混ざれば実装 PR と同じ検査。completed の回帰は常に実行 |
+| Dependabot の PR | 対象 Issue の要求だけ免除。Vitest 型・Preview 型とも completed の回帰を実行 |
 
 大野決定（2026-11-27）: 必要な `issue-N/` の実行可能シナリオが0件なら失敗。ただし実装 PR の差分が `content/` と `docs/`（`docs/factory/` を除く）のみなら、その対象の0件を例外成功にする。既存シナリオと完了済み Issue の回帰は省略しない。判定は全変更パスとリネーム元から行い、空の差分・混在・ラベルや本文による申告では例外を認めない。
+
+同日の追加決定: factory の免除も全差分とリネーム元から判定する。聖域は CODEOWNERS の `.github/`・`tests/scenarios/`・`infra/`・`docs/factory/`・ルート `AGENTS.md`・`vitest.config.mts` と一致させ、定義のずれをテストで検出する。`app/`、`package.json`、通常のテスト、`docs/RUNBOOK.md` などが1つでも混ざれば対象 Issue のシナリオを要求する（軽だけの差分には同じ0件例外を適用）。factory と Dependabot の早期 return で回帰を省略しない。
 
 必要な対象の0件、skip / todo、未完了 report、起動・収集エラー、runtime error、timeout は合格にしない。シナリオ PR では expect による検査失敗だけを反転し、単なる exit 1 を合格にしない。完了済みの対象は常に回帰として成功が必要。シナリオをまだ導入していない main の回帰対象なしは、対象外0グループとして記録する。
 
@@ -117,6 +120,8 @@ test("トップの見出し", async ({ page }) => {
 
 Preview 型はこの共通 fixture の `page` / `context` を使う。bypass header を直接組み立てたり、`request` / `page.request` に secret を渡さない。共通 fixture は各 HTTP redirect を一段で止め、同じ origin か毎回判定してから header を付ける。外部 origin では既存の bypass header も取り除く。service worker は無効。検証済み origin の `/` に先にアクセスし、HTTP 200 を確認できなければシナリオを起動しない。
 
+共通 fixture は各テストで自動実行し、context の設定後に annotation を付ける。reporter は各テストの annotation が無ければ不合格にする。`@playwright/test` から直接 import し、保護ページへの expect が失敗しただけのテストは反転合格しない。この記録は誤った import の検出であり、悪意あるシナリオによる偽装まで防ぐものではない。
+
 ```ts
 // tests/scenarios/issue-N/loader.scenario.test.ts（Vitest 型）
 import { test, expect } from "vitest";
@@ -131,13 +136,19 @@ Vitest 型は Preview から観測できない検査に限定する。上は書�
 
 通常の `pnpm test` はシナリオを除外するので、実装前の失敗シナリオが main の `ci` を壊さない。実行には base の Vitest 本体・`tests/scenarios/*config.mts` / reporter を使い、個別対象のファイルだけを CLI 引数で選ぶ。head の依存 install は `--ignore-scripts` で行い、`vitest` import も base に固定する。`.github/` と `tests/scenarios/` の共通部分の変更は factory PR に限る。
 
-`plan` は GitHub API の最新 PR / Issue と差分を取得し、Preview 型には対象 SHA・環境・Vercel bot の成功 deployment と status を照合した HTTPS の `*.vercel.app` origin を渡す。PR 本文の URL、別 SHA、任意ドメイン、URL 内の認証・パス・クエリは受け付けない。Preview が未作成なら最大10分待機し、取得不能なら失敗。main は同じ SHA の production deployment を使う。GitHub の deployments 投稿が無効なら成功へ代替せず失敗する。
+`plan` は GitHub API の最新 PR / Issue と差分を取得し、Preview 型には対象 SHA・環境・Vercel bot の成功 deployment と status を照合した HTTPS の `*.vercel.app` origin を渡す。PR 本文の URL、別 SHA、任意ドメイン、URL 内の認証・パス・クエリは受け付けない。Preview が未作成なら10秒間隔で最大60回取得し、取得不能なら失敗。待機中の HTTP 5xx だけは次の試行へ進め、401/403 などは即座に失敗させる。main は同じ SHA の production deployment を使う。GitHub の deployments 投稿が無効なら成功へ代替せず失敗する。実データの環境名の確認は HCP 反映後の受け入れに残す。
 
-`plan` と最終集約は base 側の runner を使う。導入前で base に runner が無い場合は workflow 内の最小の API 判定で factory / Dependabot だけを対象外にし、通常の実装 PR は拒否する。runner / workflow の改変は別の base 側 `pr-guard` の必須チェックでも拒否する。実装・回帰のシナリオ本文は base を使い、シナリオ PR の検査対象だけ head を使う。Vitest 実行 job は対象 head の依存・コードを扱うが secrets は渡さない。Preview 実行 job は base の依存・設定・reporter と、選択した `issue-N/` だけを使い、head の install を実行しない。
+`plan` と最終集約は base 側の runner を使う。導入専用 bootstrap は設けない。base に runner が無い導入 PR では新しい `scenarios` は実行不能だが、導入前にはまだ必須チェックではない。人が既存の必須チェックと plan を確認して導入し、main の新しい runner で回帰と必須化を確認する。runner / workflow の改変は別の base 側 `pr-guard` の必須チェックでも拒否する。実装・回帰のシナリオ本文は base を使い、シナリオ PR の検査対象だけ head を使う。Vitest 実行 job は対象 head の依存・コードを扱うが secrets は渡さない。Preview 実行 job は base の依存・設定・reporter と、選択した `issue-N/` だけを使い、head の install を実行しない。
 
 Vitest 型は実装コードと同じプロセスに入るため、悪意ある実装が環境変数や report を操作することまで防ぐ独立した検証境界ではない。base の実行器への固定で依存・install による単純なすり替えを抑えるが、Preview からの外部検査を基本とし、この限界とソースレビューを残す。
 
 report はテスト ID・planned / 実行件数・status だけを出し、生の stdout / stderr、テスト名・エラーの expected / actual、HTTP レスポンス、trace / screenshot / video は保存・アップロードしない。SHA と実行エンジン・対象 Issue・exit code をログに残す。API エラー、job 失敗、report 欠落でも最終 job `scenarios` は失敗する。
+
+子プロセスの stdio は ignore にし、大量のログによる maxBuffer 超過で検査が中断しないようにする。secret 未登録・事前アクセス不良・起動不能・timeout・report 欠落は runner が持つ固定文で出し分ける。外部からの不明な例外の本文は出さない。両 engine が必要なグループでは engine 別 report の欠落・重複も拒否する。
+
+`issue-N/` のテストは `.scenario.test.ts` / `.scenario.spec.ts` に限定する。別拡張子や `.test.ts` / `.spec.ts` だけの名前など、テストらしいファイルを黙って除外せず失敗させる。補助ファイルは通常の `.ts` などで置ける。symlink は tests / scenarios の入口と配下で拒否する。
+
+Issue の状態やラベルの変更だけでは既存 PR を再判定しない。成功後に completed / not_planned が変わると証拠が古くなるため、必要な PR を再実行する。strict と main push の回帰はこのずれを完全には防がない。main は SHA ごとに concurrency group を分けて新しい push でキャンセルせず、PR の古い run だけをキャンセルする。
 
 将来別リポへ移す際は Preview シナリオ、共通 fixture / 設定 / reporter と実行入口を一緒に移し、対象 SHA と検証済み origin を入力として渡す。Preview 型はアプリのソースを import しない。Vitest 型は対象コードの checkout が別途必要となる。
 
@@ -149,7 +160,7 @@ report はテスト ID・planned / 実行件数・status だけを出し、生�
 
 漏えい時の影響は **保護された Preview と本番 `*.vercel.app` の閲覧**。鍵の失効・再発行が必要になる。bypass はアプリ独自の認証を代替するものではなく、到達できる endpoint に副作用がある場合はその挙動も別途評価する。Vercel は最初の bypass を `VERCEL_AUTOMATION_BYPASS_SECRET` システム環境変数として deployment に公開するので、GitHub だけに存在する鍵とは扱わない。
 
-鍵は大野が Vercel で発行し、`infra/secrets.enc.yaml` に一度保存する。Terraform は予約キーを通常の Vercel 環境変数一覧から除き、`github_actions_secret` にだけ渡す。`vercel_project_protection_bypass` は secret を含む ID が非 Sensitive なので使わない。鍵がない状態では secret resource は0件で、通常の検証・factory 対象外判定は可能。ただし実際の Preview 検査は未登録を失敗にする。登録・HCP 権限・更新手順は RUNBOOK を参照する。
+鍵は大野が Vercel で発行し、`infra/secrets.enc.yaml` に一度保存する。Terraform は予約キーを通常の Vercel 環境変数一覧から除き、`github_actions_secret` と `github_dependabot_secret` に同じ値を渡す。Dependabot の run は Actions secret を使えないため、同名の Dependabot secret も必要。`vercel_project_protection_bypass` は secret を含む ID が非 Sensitive なので使わない。鍵がない状態では両 secret resource は0件で、通常のローカル検証は可能。ただし実際の Preview 検査は未登録を失敗にする。登録・HCP 権限・更新手順は RUNBOOK を参照する。
 
 ## 4. 危険度と承認
 

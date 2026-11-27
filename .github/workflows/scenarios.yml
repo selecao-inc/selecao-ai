@@ -9,8 +9,8 @@ on:
 permissions: {}
 
 concurrency:
-  group: scenarios-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: scenarios-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -42,36 +42,8 @@ jobs:
         with:
           node-version-file: package.json
       - id: plan
-        # 判定・origin は base で作る。導入前は factory / Dependabot だけを安全に対象外にする。
-        run: |
-          if test -f .github/scripts/scenario-runner.mts; then
-            node .github/scripts/scenario-runner.mts plan .scenario-work/subject .scenario-work/plan.json
-          else
-            node --input-type=module -e '
-              import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
-              import { parseClosingRefs } from "./.github/scripts/pr-guard.mts";
-              const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
-              const api = async (path) => {
-                const r = await fetch("https://api.github.com/repos/" + process.env.GITHUB_REPOSITORY + path,
-                  { headers: { authorization: "Bearer " + process.env.GITHUB_TOKEN }, signal: AbortSignal.timeout(30000) });
-                if (!r.ok) throw new Error("Bootstrap API failed");
-                return r.json();
-              };
-              if (!event.pull_request) throw new Error("Base runner is not installed");
-              const pr = await api("/pulls/" + event.pull_request.number);
-              if (pr.head.sha !== process.env.SUBJECT_SHA) throw new Error("Stale head");
-              if (pr.user.login !== "dependabot[bot]") {
-                const refs = parseClosingRefs(pr.body || "");
-                if (refs.length !== 1 || (refs[0].repo && refs[0].repo !== process.env.GITHUB_REPOSITORY.toLowerCase())) throw new Error("Invalid Issue");
-                const issue = await api("/issues/" + refs[0].number);
-                const labels = issue.labels.map((l) => l.name);
-                if (issue.pull_request || issue.state !== "open" || !labels.includes("factory") || labels.includes("scenario")) throw new Error("Bootstrap only allows factory PRs");
-              }
-              writeFileSync(".scenario-work/plan.json", JSON.stringify({sha: process.env.SUBJECT_SHA, groups: [], skipped: ["Bootstrap: factory / Dependabot 対象外"], exempt: true}));
-              appendFileSync(process.env.GITHUB_OUTPUT, "preview=false\nvitest=false\norigin=\n");
-              console.log("Bootstrap: factory / Dependabot 対象外");
-            '
-          fi
+        # PR のコードではなく base 側の runner で判定する。
+        run: node .github/scripts/scenario-runner.mts plan .scenario-work/subject .scenario-work/plan.json
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - uses: actions/upload-artifact@v6
@@ -191,14 +163,4 @@ jobs:
           pattern: scenario-result-*
           merge-multiple: true
           path: .scenario-work/results
-      - run: |
-          if test -f .github/scripts/scenario-runner.mts; then
-            node .github/scripts/scenario-runner.mts judge .scenario-work/plan.json .scenario-work/results
-          else
-            node --input-type=module -e '
-              import { readFileSync } from "node:fs";
-              const plan = JSON.parse(readFileSync(".scenario-work/plan.json", "utf8"));
-              if (!plan.exempt || plan.groups.length || plan.sha !== process.env.SUBJECT_SHA) throw new Error("Invalid bootstrap plan");
-              console.log("Bootstrap: PASS (factory / Dependabot 対象外)");
-            '
-          fi
+      - run: node .github/scripts/scenario-runner.mts judge .scenario-work/plan.json .scenario-work/results
