@@ -35,6 +35,59 @@ https://github.com/selecao-inc/selecao-ai/pull/55#issuecomment-6916680112
 
 承認人数 0 のままで CODEOWNERS 承認が強制されないと判明したら停止して大野へ返す。全 PR の承認必須化へ無断で切り替えない。
 
+### pr-guard の受け入れ確認（Issue #60）
+
+2026-11-26（JST）、Codex が bot `selecao-agents`（push=true・admin=false）で Issue #60 の確認1〜6を実施し、すべて期待どおりとなった。大野の指示で #58 完了前に先行実施した。2026-12-02 より前の確認であり、Actions policy 設定後の再確認と制限適用後の起動確認は #58 に残す。今回の成功を policy 設定済みの証拠にはしない。
+
+以下の取得日時は UTC。`gh pr view --json`、`gh pr checks --required`、`gh api` の Actions run / jobs / check-runs、`gh run view --log` を取得した。必須欄の `ci`・`pr-guard` と `statusCheckRollup` の job 名を照合し、CODEOWNERS 未承認による停止とは分けて判定した。main 保護の REST API は bot では HTTP 404 だったため、strict・HCP apply・plan 差分ゼロを今回独立確認したとは扱わない（#60 の背景には大野の反映確認済みの記録がある）。
+
+テストIssue #61・#62・#63 はすべてラベルなし（実装 PR）。既存の本物の Issue を `Closes` で指定していない。ブランチと対応は次のとおり。SHA の記号は下の結果表にも使用する。
+
+| PR / テストIssue | ブランチ | PR head SHA |
+|---|---|---|
+| #64 / #61 | `YusukeOhno16/issue-61-guard-body-test` | A = `11f429cd618e533c37752d3b6d1910ca23346264` |
+| #65 / #62 | `YusukeOhno16/issue-62-guard-scenario-test` | B = `d83bd9199557486c5ee29cb43203ce9323f6649b` |
+| #66 / #63 | `YusukeOhno16/issue-63-guard-tamper-test` | C = `b03743981503ed342d401675b25f63d960f31a97` |
+| #64 / #61（push 後） | `YusukeOhno16/issue-61-guard-body-test` | D = `9244170271887f5ec0e7422e4aa1d0fcc7f30501` |
+
+全7回とも **job 名 `pr-guard`・event `pull_request_target`**。checkout ログの `ref` は **`3f2d229a4b5074968ae0842ea5760d5ff45c86d9`（main / PR #57）**、`HEAD is now at 3f2d229` も確認した。ログの対象 head と check run の `head_sha` は、それぞれ表の PR head と一致した。権限ログは Contents / Issues / PullRequests が read、Metadata が read。
+
+| 確認（pass） | PR | 取得時刻 UTC | PR head / check head_sha | Actions run / check run ID | pr-guard の結果 | ci / mergeStateStatus |
+|---|---|---|---|---|---|---|
+| 1. Closes なし | #64 | 13:17:53 | A / A | `45827579946` / `139935595237` | failure（規則1で失敗） | pass / BLOCKED |
+| 2. 実装 PR のシナリオ変更 | #65 | 13:17:59 | B / B | `45827590649` / `139935633046` | failure（規則4で失敗） | pass / BLOCKED |
+| 3. 判定器・workflow の常時成功化 | #66 | 13:18:06 | C / C | `45827652658` / `139935851491` | failure（両パスを規則4で拒否） | pass / BLOCKED |
+| 4. 正常な本文に修正 | #64 | 13:18:52 | A / A | `45827866558` / `139936590549` | success（成功、待機なし） | pass / CLEAN |
+| 5a. 同じ head で Closes 削除 | #64 | 13:19:24 | A / A | `45827953259` / `139936900825` | failure（規則1で失敗） | pass / BLOCKED |
+| 5b. 同じ head で復元 | #64 | 13:20:12 | A / A | `45828042430` / `139937213356` | success（成功、待機なし） | pass / CLEAN |
+| 6. push で新 head | #64 | 13:22:02 | D / D | `45828162386` / `139937626118` | success（新 head の判定が成功） | pass / CLEAN |
+
+確認1〜3はすべて `ci=pass` でも、`gh pr checks --required` が `pr-guard=fail`（exit 1）を返し、PR が BLOCKED だった。確認2は `tests/scenarios/issue-62/acceptance.md`、確認3は `.github/scripts/pr-guard.mts` と `.github/workflows/pr-guard.yml` をエラー内に列挙した。確認3の PR 側は CLI の `process.exitCode=0` と workflow の `run: "true"` に変えてあるが、main の判定器が実行された。
+
+確認4・5は PR #64 の head A を固定し、本文だけを変更した。成功時はレビュー0件で CLEAN、削除後は必須欄の新しい pr-guard が pending → fail、BLOCKED、復元後は pass・CLEAN。`statusCheckRollup` には過去の成功・失敗も残るため、最新 run の check run と必須欄を照合し、古い成功で通過していないことを確認した。
+
+確認6は head A → D の push 後、新 head D の `statusCheckRollup` に新規 run `45828162386` の pr-guard が IN_PROGRESS（必須欄 pending・exit 8）、ci が QUEUED、PR が BLOCKED になった。旧 head A の成功は新 head の成功として使われなかった。新 check run `139937626118` の `head_sha=D` とログの対象 head D、main checkout、成功を確認し、ci 完了後の CLEAN まで再取得した。
+
+Actions の証拠（上表の順。各 URL は run と job / check run を特定する）:
+
+https://github.com/selecao-inc/selecao-ai/actions/runs/45827579946/job/139935595237
+
+https://github.com/selecao-inc/selecao-ai/actions/runs/45827590649/job/139935633046
+
+https://github.com/selecao-inc/selecao-ai/actions/runs/45827652658/job/139935851491
+
+https://github.com/selecao-inc/selecao-ai/actions/runs/45827866558/job/139936590549
+
+https://github.com/selecao-inc/selecao-ai/actions/runs/45827953259/job/139936900825
+
+https://github.com/selecao-inc/selecao-ai/actions/runs/45828042430/job/139937213356
+
+https://github.com/selecao-inc/selecao-ai/actions/runs/45828162386/job/139937626118
+
+テスト PR #64・#65・#66 はマージせずクローズし、`state=CLOSED`・`mergedAt=null` を再取得した。テスト用リモート・ローカルブランチと子 worktree を削除し、Issue #61・#62・#63 を閉じたことも再確認した。本記録の PR は `Closes #60` とし、聖域 `docs/factory/` を含むため大野の承認を必要とする。マージは行わない。
+
+範囲外・未確認: fork PR、導入前から開いていた PR の Update branch、HCP plan 内容の再確認。policy 設定後と 12/02 以降の起動確認は #58 で行う。
+
 ### AI 用 GitHub アカウントの運用
 
 AI の push・PR 作成は machine account `selecao-agents` で行い、大野（`YusukeOhno16`）がレビュー・承認する。大野自身が聖域を変更する場合も bot から PR を出す（GitHub では自分の PR を自分で承認できないため）。
