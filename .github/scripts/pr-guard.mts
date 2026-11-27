@@ -72,7 +72,7 @@ export function classify(path: string): FileClass {
   const m = /^tests\/scenarios\/issue-(\d+)\//.exec(path);
   if (m) return { type: "scenario-issue", issue: Number(m[1]) };
   if (path.startsWith("tests/scenarios/")) return { type: "scenario-other" };
-  if (path.startsWith(".github/workflows/") || path.startsWith(".github/scripts/")) {
+  if (path.startsWith(".github/workflows/") || path.startsWith(".github/scripts/") || path === "vitest.config.mts") {
     return { type: "factory" };
   }
   return { type: "other" };
@@ -174,7 +174,7 @@ export async function checkPullRequest(
       }
     } else if (c.type === "scenario-other" || c.type === "factory") {
       if (kind === "factory") continue;
-      const area = c.type === "factory" ? ".github/workflows/・.github/scripts/" : "tests/scenarios/";
+      const area = c.type === "factory" ? ".github/workflows/・.github/scripts/・vitest.config.mts" : "tests/scenarios/";
       errors.push(`[規則4] ${KIND_LABEL[kind]} は ${area} を変更できません（${why}）: ${path}`);
     }
   }

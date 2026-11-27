@@ -1,0 +1,204 @@
+name: scenarios
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: scenarios-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      deployments: read
+    outputs:
+      preview: ${{ steps.plan.outputs.preview }}
+      vitest: ${{ steps.plan.outputs.vitest }}
+      origin: ${{ steps.plan.outputs.origin }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          path: .scenario-work/subject
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+      - id: plan
+        # 判定・origin は base で作る。導入前は factory / Dependabot だけを安全に対象外にする。
+        run: |
+          if test -f .github/scripts/scenario-runner.mts; then
+            node .github/scripts/scenario-runner.mts plan .scenario-work/subject .scenario-work/plan.json
+          else
+            node --input-type=module -e '
+              import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
+              import { parseClosingRefs } from "./.github/scripts/pr-guard.mts";
+              const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
+              const api = async (path) => {
+                const r = await fetch("https://api.github.com/repos/" + process.env.GITHUB_REPOSITORY + path,
+                  { headers: { authorization: "Bearer " + process.env.GITHUB_TOKEN }, signal: AbortSignal.timeout(30000) });
+                if (!r.ok) throw new Error("Bootstrap API failed");
+                return r.json();
+              };
+              if (!event.pull_request) throw new Error("Base runner is not installed");
+              const pr = await api("/pulls/" + event.pull_request.number);
+              if (pr.head.sha !== process.env.SUBJECT_SHA) throw new Error("Stale head");
+              if (pr.user.login !== "dependabot[bot]") {
+                const refs = parseClosingRefs(pr.body || "");
+                if (refs.length !== 1 || (refs[0].repo && refs[0].repo !== process.env.GITHUB_REPOSITORY.toLowerCase())) throw new Error("Invalid Issue");
+                const issue = await api("/issues/" + refs[0].number);
+                const labels = issue.labels.map((l) => l.name);
+                if (issue.pull_request || issue.state !== "open" || !labels.includes("factory") || labels.includes("scenario")) throw new Error("Bootstrap only allows factory PRs");
+              }
+              writeFileSync(".scenario-work/plan.json", JSON.stringify({sha: process.env.SUBJECT_SHA, groups: [], skipped: ["Bootstrap: factory / Dependabot 対象外"], exempt: true}));
+              appendFileSync(process.env.GITHUB_OUTPUT, "preview=false\nvitest=false\norigin=\n");
+              console.log("Bootstrap: factory / Dependabot 対象外");
+            '
+          fi
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: scenario-plan
+          path: .scenario-work/plan.json
+          include-hidden-files: true
+          if-no-files-found: error
+
+  vitest:
+    needs: plan
+    if: needs.plan.outputs.vitest == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          path: .scenario-work/subject
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+      - run: pnpm install --frozen-lockfile
+      # head の install・コードを実行する job には bypass などの secrets を渡さない。
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+        working-directory: .scenario-work/subject
+      - uses: actions/download-artifact@v7
+        with:
+          name: scenario-plan
+          path: .scenario-work
+      - run: node .github/scripts/scenario-runner.mts run .scenario-work/subject .scenario-work/plan.json vitest .scenario-work/vitest.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: scenario-result-vitest
+          path: .scenario-work/vitest.json
+          include-hidden-files: true
+          if-no-files-found: error
+
+  preview:
+    needs: plan
+    if: needs.plan.outputs.preview == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          path: .scenario-work/subject
+          # この checkout はテスト本文を読むためだけに使用する。
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+      # base の固定依存だけを使う。head の install・設定は実行しない。
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - uses: actions/download-artifact@v7
+        with:
+          name: scenario-plan
+          path: .scenario-work
+      - run: node .github/scripts/scenario-runner.mts run .scenario-work/subject .scenario-work/plan.json preview .scenario-work/preview.json
+        env:
+          PREVIEW_ORIGIN: ${{ needs.plan.outputs.origin }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: scenario-result-preview
+          path: .scenario-work/preview.json
+          include-hidden-files: true
+          if-no-files-found: error
+
+  scenarios:
+    if: always()
+    needs: [plan, vitest, preview]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: 必要な job の完了を確認
+        env:
+          PLAN: ${{ needs.plan.result }}
+          VITEST: ${{ needs.vitest.result }}
+          PREVIEW: ${{ needs.preview.result }}
+        run: |
+          test "$PLAN" = success
+          test "$VITEST" = success -o "$VITEST" = skipped
+          test "$PREVIEW" = success -o "$PREVIEW" = skipped
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+      - uses: actions/download-artifact@v7
+        with:
+          name: scenario-plan
+          path: .scenario-work
+      - uses: actions/download-artifact@v7
+        if: needs.plan.outputs.preview == 'true' || needs.plan.outputs.vitest == 'true'
+        with:
+          pattern: scenario-result-*
+          merge-multiple: true
+          path: .scenario-work/results
+      - run: |
+          if test -f .github/scripts/scenario-runner.mts; then
+            node .github/scripts/scenario-runner.mts judge .scenario-work/plan.json .scenario-work/results
+          else
+            node --input-type=module -e '
+              import { readFileSync } from "node:fs";
+              const plan = JSON.parse(readFileSync(".scenario-work/plan.json", "utf8"));
+              if (!plan.exempt || plan.groups.length || plan.sha !== process.env.SUBJECT_SHA) throw new Error("Invalid bootstrap plan");
+              console.log("Bootstrap: PASS (factory / Dependabot 対象外)");
+            '
+          fi

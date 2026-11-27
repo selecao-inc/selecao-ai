@@ -44,3 +44,6 @@ next-env.d.ts
 .terraform/
 *.tfstate
 *.tfstate.*
+# シナリオ実行の中間 report と一時 checkout（秘密を含む生ログは保存しない）
+.scenario-work/
+test-results/

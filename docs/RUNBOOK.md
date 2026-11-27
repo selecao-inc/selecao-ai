@@ -6,6 +6,57 @@
 
 ## GitHub ブランチ保護
 
+### シナリオ CI の導入と bypass 登録（Issue #47）
+
+2026-11-27 大野決定。鍵の発行と SOPS への初回保存は大野が行い、GitHub Actions への転記は Terraform に任せる。`vercel_project_protection_bypass` は使わない。bypass を使う job に承認付き Environment は設けない。判断の理由・影響範囲と運用前提は `docs/factory/verification.md` の bypass 節を参照。
+
+予約キーは **`GITHUB_ACTIONS_VERCEL_AUTOMATION_BYPASS_SECRET`**（トップレベルの文字列）。既存のフラットなアプリ用キーは変更しない。この1キーだけを Vercel の環境変数作成から除き、GitHub の `VERCEL_AUTOMATION_BYPASS_SECRET` に渡す。SOPS ファイルを分割したり、既存キーをネストへ移動しない。未登録なら GitHub secret resource は0件。空文字を登録した場合は plan/apply の precondition で失敗する。
+
+大野の作業（リポジトリ直下で実施）:
+
+1. HCP の fine-grained `GITHUB_TOKEN` に、このリポジトリの **Secrets: Read and write** を追加する。既存の Administration / Contents 権限は維持する。GitHub secret の値は HCP state にも残るため、state の閲覧権限を制限する。Actions job の `GITHUB_TOKEN` の権限とは別。
+2. Vercel → selecao-ai → Settings → Deployment Protection → Protection Bypass for Automation で CI 用の鍵を発行する。最初の bypass は Vercel がシステム環境変数として deployment に公開する。既存 bypass の有無と表示を確認する。鍵は保護された Preview と本番 `*.vercel.app` の閲覧に使える。
+3. コピーする前にクリップボード履歴・他端末との共有を無効化し、ターミナルのコマンド記録 (`set -x`) が無効な状態で作業する。値をチャット・Issue・PR・シェル引数・平文ファイルに貼らない。Vercel の鍵だけをクリップボードにコピーする。
+4. age 鍵の場所を指定し、クリップボードから標準入力で SOPS に渡す。Python は JSON 文字列に変換するだけで、値をターミナルに表示しない。既存キーを保持したまま予約キーを設定する。`sops set --value-stdin` が利用できることを先に `sops set --help` で確認する。
+
+```bash
+export SOPS_AGE_KEY_FILE="$HOME/.config/sops/age/keys.txt"
+```
+
+```bash
+pbpaste | python3 -c 'import json,sys; value=sys.stdin.read().strip(); assert value, "Clipboard is empty"; print(json.dumps(value))' | sops set --value-stdin infra/secrets.enc.yaml '["GITHUB_ACTIONS_VERCEL_AUTOMATION_BYPASS_SECRET"]'
+```
+
+5. 成功・失敗にかかわらず直後にクリップボードを空にする。履歴機能に残った場合はその履歴も人が削除する。
+
+```bash
+pbcopy < /dev/null
+```
+
+6. `git diff -- infra/secrets.enc.yaml` で新しい値が `ENC[...]` であること、既存キーを削除していないことを確認する。復号値をログへ出す `sops -d` は使わない。予約キー以外の意図しない変更があれば停止する。暗号化ファイルの変更も PR 経由で反映する。
+7. HCP plan は GitHub secret 1件の作成（値は非表示）を示し、同名の `vercel_project_environment_variable` を作らず、既存 Vercel 環境変数を削除・置換しないことを確認する。人が承認・マージして HCP apply の成功を確認する。手元で apply しない。
+
+導入と検証:
+
+- #47 自体は factory PR なのでシナリオ実行対象外。秘密が未登録でも `pnpm install --frozen-lockfile` / lint / typecheck / test / build を通せる。
+- main への導入後に workflow が利用できること、GitHub 必須欄に `ci` / `pr-guard` / `scenarios` があること、HCP の反映を確認する。定義だけで必須化済みとは報告しない。
+- 鍵の登録・反映後、承認されたテスト用 Issue / PR で、検査失敗の反転、常時成功拒否、0件・起動エラー・timeout 拒否、同じ SHA の Preview 実アクセスと SHA 不一致・欠落拒否、完了済み回帰、軽の例外、factory / Dependabot 対象外を確認する。head SHA・Actions run・exit code・件数を記録し、テスト PR はマージせず閉じる。
+- Preview の取得は GitHub Deployments / statuses を使う。2026-11-27、Codex が deployments API（per_page=3）を取得した結果は空配列だった。設定の無効化が原因とまでは断定しない。`infra/main.tf` の `git_provider_options.create_deployments=true` を HCP で反映し、新しい deployment で GitHub への投稿を確認する。既存 deployment の履歴が遡って作られるとは扱わない。投稿がない場合は別 URL に代替せず停止する。
+- 今回のローカル検証には実鍵・実 Vercel Preview・HCP apply を使わない。実サービスでの受け入れ結果は未確認として別途追記する。
+
+ローカル検証は Node / pnpm を `package.json` の版にそろえる。初回は `pnpm exec playwright install chromium` を実行してから通常の検証コマンドを実行する（CI は Chromium をインストールする）。Terraform は `versions.tf` の固定版で次を実行する。`terraform test` は全 provider を mock にし、鍵なし・既存キー・予約キー・空の鍵の4ケースを plan だけで検査する。実鍵の復号や HCP への plan / apply は行わない。
+
+2026-11-27、Codex が Node 24.22.2 / pnpm 10.28.0 で install・lint・typecheck・test（7ファイル116件）を exit 0 で確認。実 Chromium で別 origin への redirect に header が漏れないことも含む。build は既存 Next.js 16.4.3 の脆弱性警告で初回 exit 1、同じコマンドの再実行は警告付き exit 0。依存更新は今回に含めていない。Terraform 1.16.6 の fmt / validate、mock test 4件、workflow の actionlint も成功した。実鍵・Vercel Preview の実アクセス・HCP apply・必須化の受け入れは未実施。
+
+```bash
+terraform -chdir=infra init -backend=false -lockfile=readonly -input=false
+terraform -chdir=infra fmt -check
+terraform -chdir=infra validate
+terraform -chdir=infra test
+```
+
+漏えい・ローテーション時は旧 bypass を Vercel で失効させ、再発行した値を同じ予約キーに SOPS で保存し、PR → HCP apply で GitHub secret を更新する。Vercel のシステム環境変数の更新が既存 deployment に反映されるとは扱わず、必要な deployment の再作成も確認する。旧キーの失効から新キー反映まで Preview 検査は失敗する。失敗を隠してマージしない。
+
 `infra/github.tf` で既存の `selecao-inc/selecao-ai` を import し、main を保護する。PR 必須・必須チェック `ci` と `pr-guard`（Issue #46。規則は [verification.md](factory/verification.md#pr-の識別と変更範囲の判定issue-46)）・通常の承認人数 0 人・聖域の CODEOWNERS 承認必須・管理者にも適用・force push / 削除禁止。マージ方法は Squash のみで、マージ後に作業ブランチを自動削除する。
 
 `infra/` を変更していない [PR #20](https://github.com/selecao-inc/selecao-ai/pull/20)・[PR #21](https://github.com/selecao-inc/selecao-ai/pull/21) でも、`Terraform Cloud/selecao-inc/...` チェックが実行され、成功した（2026-10-21）。HCP の VCS トリガー設定は未確認で、全 PR での実行条件は確認できていないため、HCP Terraform のチェックは必須にしない。`infra/` の変更時は HCP の plan をレビューする。

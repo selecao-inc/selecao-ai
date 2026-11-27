@@ -133,7 +133,7 @@ describe("規則4: ラベルと変更範囲", () => {
       expect(r.status).toBe("fail");
     });
 
-    it.each([".github/workflows/ci.yml", ".github/scripts/pr-guard.mts"])("%s を変えると失敗する", async (path) => {
+    it.each([".github/workflows/ci.yml", ".github/scripts/pr-guard.mts", "vitest.config.mts"])("%s を変えると失敗する", async (path) => {
       const r = await checkPullRequest(input({ changedFiles: [path] }), found(issue()));
       expect(r).toEqual({ status: "fail", errors: [expect.stringContaining(path)] });
     });
