@@ -12,6 +12,8 @@
 
 予約キーは **`GITHUB_ACTIONS_VERCEL_AUTOMATION_BYPASS_SECRET`**（トップレベルの文字列）。既存のフラットなアプリ用キーは変更しない。この1キーだけを Vercel の環境変数作成から除き、GitHub の `VERCEL_AUTOMATION_BYPASS_SECRET` に渡す。SOPS ファイルを分割したり、既存キーをネストへ移動しない。未登録なら GitHub secret resource は0件。空文字を登録した場合は plan/apply の precondition で失敗する。
 
+2026-11-27、大野からの完了報告を Codex が記録: HCP 用 fine-grained token `hcp-terraform-selecao-ai` に Secrets: Read and write を追加済み。Administration RW・Contents RO・Metadata RO は維持。Vercel でメモ `GitHub Actions scenario runner (#47)` の bypass を発行し、selecao-ai にはこれ1件だけで、以前の bypass は存在しない。この鍵が最初の bypass として deployment のシステム環境変数にもなる。Claude が上記予約キーへ SOPS で保存し、クリップボードを消去済み（外部設定と消去の実施は大野・Claude からの共有情報で、Codex の再確認ではない）。Codex は暗号化ファイルの差分を復号せず確認し、暗号化された予約キー1行の追加と `sops.lastmodified` / `sops.mac` の更新だけで、他の内容が変わっていないことを確認した。GitHub Actions secret への受け渡し・HCP apply・実 Preview の受け入れは引き続き未実施。
+
 大野の作業（リポジトリ直下で実施）:
 
 1. HCP の fine-grained `GITHUB_TOKEN` に、このリポジトリの **Secrets: Read and write** を追加する。既存の Administration / Contents 権限は維持する。GitHub secret の値は HCP state にも残るため、state の閲覧権限を制限する。Actions job の `GITHUB_TOKEN` の権限とは別。
